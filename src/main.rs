@@ -11,9 +11,9 @@ mod error;
 mod serialized_structs;
 
 use error::Error;
+use openssl::{pkey::Private, rsa::Rsa};
 use reqwest::blocking::Client;
 use reqwest::Url;
-use openssl::{pkey::Private, rsa::Rsa};
 use serialized_structs::GetDirectory;
 
 const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
@@ -30,9 +30,9 @@ fn main() {
 
     let response = send_get_new_nonce(&client).unwrap();
     println!("test");
-    println!("{}", response);
+    println!("{}", response.unwrap());
 
-    //parse the 
+    //parse the
 
     //println!("{}", get_directory(&client).unwrap());
 }
@@ -50,9 +50,15 @@ fn send_get_directory_request(client: &Client) -> Result<GetDirectory, Error> {
     Ok(client.get(url).send()?.json()?)
 }
 
-fn send_get_new_nonce(client: &Client) -> Option<String> {
-    let url = Url::parse(NONCE).unwrap();
-    Some(client.head(url).send().unwrap().headers().get("replay-nonce").unwrap().to_str().unwrap().to_owned())
+fn send_get_new_nonce(client: &Client) -> Result<Option<String>, Error> {
+    let url = Url::parse(NONCE)?;
+    // TODO: make nicer
+    Ok(client
+        .head(url)
+        .send()?
+        .headers()
+        .get("replay-nonce")
+        .map(|value| String::from(value.to_str().unwrap())))
 }
 
 #[allow(dead_code)]
