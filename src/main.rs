@@ -7,23 +7,19 @@
 ///     Ok(T),
 ///     Err(E)    
 // }
+mod error;
 
 use reqwest::blocking::Client;
 use reqwest::Url;
 
-const SERVER: &str = "http://google.de";
+const SERVER: &str = "https://google.de";
 
 fn main() {
     let client = Client::new();
     println!("{}", send_get_request(&client).unwrap());
-
-    println!("{}", send_get_request(&client).unwrap());
 }
 
-fn send_get_request(client: &Client) -> Result<String, reqwest::Error> {
-    if let Ok(url) = Url::parse(SERVER) {
-        return client.get(url).send()?.text();
-    }
-    Ok(String::from("-Hat ned geklappt"))
+fn send_get_request(client: &Client) -> Result<String, error::Error> {
+    let url = Url::parse(SERVER)?;
+    Ok(client.get(url).send()?.text()?)
 }
-
