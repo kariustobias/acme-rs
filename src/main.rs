@@ -9,10 +9,13 @@
 // }
 mod error;
 
+use error::Error;
 use reqwest::blocking::Client;
 use reqwest::Url;
+use openssl::{pkey::Private, rsa::Rsa};
 
 const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
+const KEY_WIDTH: u32 = 2048;
 
 fn main() {
     let client = Client::new();
@@ -36,7 +39,11 @@ fn get_directory(client: &Client) {
     //store the important URLs
 }
 
-fn send_get_directory_request(client: &Client) -> Result<String, error::Error> {
+fn send_get_directory_request(client: &Client) -> Result<String, Error> {
     let url = Url::parse(SERVER)?;
     Ok(client.get(url).send()?.text()?)
+}
+
+fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
+    Ok(Rsa::generate(KEY_WIDTH)?)
 }
