@@ -29,8 +29,7 @@ fn main() {
     get_directory(&client);
 
     let response = send_get_new_nonce(&client).unwrap();
-    println!("test");
-    println!("{}", response.unwrap());
+    println!("Our nonce: {}", response);
 
     //parse the
 
@@ -50,15 +49,19 @@ fn send_get_directory_request(client: &Client) -> Result<GetDirectory, Error> {
     Ok(client.get(url).send()?.json()?)
 }
 
-fn send_get_new_nonce(client: &Client) -> Result<Option<String>, Error> {
+fn send_get_new_nonce(client: &Client) -> Result<String, Error> {
     let url = Url::parse(NONCE)?;
-    // TODO: make nicer
-    Ok(client
-        .head(url)
-        .send()?
-        .headers()
-        .get("replay-nonce")
-        .map(|value| String::from(value.to_str().unwrap())))
+    // this should never fail, as the whole protocol uses utf-8
+    Ok(std::str::from_utf8(
+        client
+            .head(url)
+            .send()?
+            .headers()
+            .get("replay-nonce")
+            .ok_or(Error::BadNonce)?
+            .as_bytes(),
+    )?
+    .to_owned())
 }
 
 #[allow(dead_code)]
