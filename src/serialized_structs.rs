@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-enum StatusType {
+pub enum StatusType {
     Valid,
     Pending,
     Invalid,
@@ -24,16 +24,16 @@ pub struct GetDirectory {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RegisterAccount {
     // Terms_of_Service_agreed:bool, contact:String
-    payload: (bool, serde_json::Value),
-    protected: serde_json::Value,
-    signature: String,
+    pub payload: (bool, serde_json::Value),
+    pub protected: serde_json::Value,
+    pub signature: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccountCreated {
-    contact: serde_json::Value,
-    status: StatusType,
-    orders: String,
+    pub contact: serde_json::Value,
+    pub status: StatusType,
+    pub orders: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
