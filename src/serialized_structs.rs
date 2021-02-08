@@ -8,11 +8,16 @@ enum StatusType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GetDirectory {
+pub struct GetDirectory {
+    #[serde(rename="newNonce")]
     new_nonce: String,
+    #[serde(rename="newAccount")]
     new_account: String,
+    #[serde(rename="newOrder")]
     new_order: String,
+    #[serde(rename="revokeCert")]
     revoke_cert: String,
+    #[serde(rename="keyChange")]
     key_change: String,
 }
 
