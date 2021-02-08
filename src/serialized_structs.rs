@@ -22,15 +22,15 @@ pub struct GetDirectory {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct RegisterAccount {
+pub struct RegisterAccount {
     // Terms_of_Service_agreed:bool, contact:String
-    payload: (String, serde_json::Value),
+    payload: (bool, serde_json::Value),
     protected: serde_json::Value,
     signature: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct AccountCreated {
+pub struct AccountCreated {
     contact: serde_json::Value,
     status: StatusType,
     orders: String,
