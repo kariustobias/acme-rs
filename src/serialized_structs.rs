@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 enum StatusType {
@@ -9,15 +9,15 @@ enum StatusType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetDirectory {
-    #[serde(rename="newNonce")]
+    #[serde(rename = "newNonce")]
     new_nonce: String,
-    #[serde(rename="newAccount")]
+    #[serde(rename = "newAccount")]
     new_account: String,
-    #[serde(rename="newOrder")]
+    #[serde(rename = "newOrder")]
     new_order: String,
-    #[serde(rename="revokeCert")]
+    #[serde(rename = "revokeCert")]
     revoke_cert: String,
-    #[serde(rename="keyChange")]
+    #[serde(rename = "keyChange")]
     key_change: String,
 }
 

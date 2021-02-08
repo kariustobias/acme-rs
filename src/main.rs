@@ -29,8 +29,8 @@ fn main() {
     //get the JSONs from get_directory in String form
     get_directory(&client);
     let response = send_get_new_nonce(&client).unwrap();
-    println!("test");
-    println!("{}", response);
+
+    println!("Our nonce: {}", response);
 
     //parse the 
 
@@ -52,9 +52,20 @@ fn send_get_directory_request(client: &Client) -> Result<String, Error> {
 }
 
 fn send_get_new_nonce(client: &Client) -> Result<String, Error> {
-    let url = Url::parse(NONCE).unwrap();
-    Some(client.head(url).send().unwrap().headers().get("replay-nonce").unwrap().to_str().unwrap().to_owned())
+    let url = Url::parse(NONCE)?;
+    // this should never fail, as the whole protocol uses utf-8
+    Ok(std::str::from_utf8(
+        client
+            .head(url)
+            .send()?
+            .headers()
+            .get("replay-nonce")
+            .ok_or(Error::BadNonce)?
+            .as_bytes(),
+    )?
+    .to_owned())
 }
+
 fn post_get_new_Account(client: &Client, url: String, nonce: String, mailTo:serde_json::Value, termsOfServiceAgreed: bool, signature: String) -> Option<AccountCreated>{
     let alg = "RS256";
     let jwk = json!({
