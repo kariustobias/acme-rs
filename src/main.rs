@@ -15,7 +15,7 @@ use reqwest::blocking::Client;
 use reqwest::Url;
 use openssl::{pkey::Private, rsa::Rsa};
 use serde_json::json;
-use serialized_structs::{AccountCreated, RegisterAccount};
+use serialized_structs::{Account, AccountManagment};
 
 const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 #[allow(dead_code)]
@@ -55,7 +55,7 @@ fn send_get_new_nonce(client: &Client) -> Result<String, Error> {
     let url = Url::parse(NONCE).unwrap();
     Some(client.head(url).send().unwrap().headers().get("replay-nonce").unwrap().to_str().unwrap().to_owned())
 }
-fn post_get_new_Account(client: &Client, url: String, nonce: String, mailTo:serde_json::Value, termsOfServiceAgreed: bool, signature: String) -> Option<AccountCreated>{
+fn post_get_new_Account(client: &Client, url: String, nonce: String, mailTo:serde_json::Value, termsOfServiceAgreed: bool, signature: String) -> Option<Account>{
     let alg = "RS256";
     let jwk = json!({
         "e" : ["AQAB"],
@@ -68,10 +68,10 @@ fn post_get_new_Account(client: &Client, url: String, nonce: String, mailTo:serd
         "nonce": [nonce],
         "jwk" : [jwk],
         });
-    let data: serialized_structs::RegisterAccount = RegisterAccount { payload: (termsOfServiceAgreed, mailTo), protected: (protected), signature: (signature) };
+    let data: serialized_structs::AccountManagment = AccountManagment { payload: (termsOfServiceAgreed, mailTo), protected: (protected), signature: (signature), contact: (None), terms_Of_Service_Agreed: (None), only_return_existing: (None), external_Account_Binding: (None) };
     if let Ok(accountCreation) = serde_json::to_string(&data) {
         //senden
-        let result:Result<serialized_structs::AccountCreated, reqwest::Error>  = client.post(ACCOUNT).body(accountCreation).send().unwrap().json();
+        let result:Result<serialized_structs::Account, reqwest::Error>  = client.post(ACCOUNT).body(accountCreation).send().unwrap().json();
         match result {
             Ok(data) => {return Some(data)}
             Err(error) => {println!("{:?}", error)}
