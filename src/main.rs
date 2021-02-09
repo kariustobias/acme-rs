@@ -80,14 +80,14 @@ fn post_get_new_account(
     let jws_payload = sign_payload_via_jws(payload, p_key, jws_header)?;
     let payload_for_real = json!({
         "payload": jws_payload.payload(),
-        "protected": dbg!(jws_payload.header()),
+        "protected": jws_payload.header(),
         "signature": jws_payload.signature()
     });
 
     Ok(dbg!(client
         .post(ACCOUNT)
         .header("Content-Type", "application/jose+json")
-        .body(base64::encode(payload_for_real.to_string()))
+        .body(payload_for_real.to_string())
         .send())?
         .text()?)
 }
@@ -97,10 +97,6 @@ fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
 }
 
 fn sign_payload_via_jws(payload: serde_json::Value, private_key: Rsa<Private>, header: JsonObject) -> Result<EncodedSignedMessage, Error> {
-    
-    let mut real_payload: Vec<u8> = vec![0; private_key.size() as usize];
-    let _ = private_key.private_encrypt(&payload.to_string().into_bytes(), &mut real_payload, Padding::PKCS1)?;
-
     let signer = signer::RS256Signer::new(private_key);
-    Ok(encode_sign(header, &real_payload, &signer)?)
+    Ok(encode_sign(header, &payload.to_string().into_bytes(), &signer)?)
 }
