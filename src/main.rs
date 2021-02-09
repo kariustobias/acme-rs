@@ -12,7 +12,13 @@ mod serialized_structs;
 mod signer;
 
 use error::Error;
-use openssl::{pkey::Private, rsa::{Padding, Rsa}};
+use openssl::{pkey::{self, Private}, rsa::{Padding, Rsa}};
+use openssl::x509::{X509, X509Name};
+use openssl::pkey::PKey;
+use openssl::hash::MessageDigest;
+use openssl::nid::Nid;
+use openssl::x509;
+use pkey::Public;
 use reqwest::blocking::Client;
 use reqwest::Url;
 use serde_json::json;
@@ -21,6 +27,9 @@ use jsonwebkey_convert::der::FromPem;
 use serialized_structs::{AccountCreated, GetDirectory};
 use jws::{JsonObject, compact::{EncodedSignedMessage, encode_sign}};
 use jws::hmac::{Hs512Signer};
+use x509::{X509NameBuilder, X509NameRef, X509Req, X509ReqBuilder};
+
+
 
 const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 #[allow(dead_code)]
@@ -103,4 +112,16 @@ fn sign_payload_via_jws(payload: serde_json::Value, private_key: Rsa<Private>, h
 
     let signer = signer::RS256Signer::new(private_key);
     Ok(encode_sign(header, &real_payload, &signer)?)
+}
+
+fn request_CSR(pkey:pkey::PKeyRef<Public>, privateKey:pkey::PKeyRef<Private>, commonName:String) -> X509Req{
+    let mut request = X509ReqBuilder::new().unwrap();
+    let mut cName = X509NameBuilder::new().unwrap(); 
+
+    cName.append_entry_by_nid(Nid::COMMONNAME, &commonName);
+    let name = cName.build();
+    request.set_pubkey(&pkey);
+    request.set_subject_name(name.as_ref());
+    request.sign(&privateKey,MessageDigest::sha256()).unwrap();
+    return request.build();
 }
