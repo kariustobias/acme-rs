@@ -14,3 +14,5 @@ url = "2.2.0"
 openssl = { version = "0.10", features = ["vendored"] }
 rpki = "0.10.0"
 base64 = "0.13.0"
+jws = "0.2.4"
+jsonwebkey-convert = { version="0.3.0", features = ["simple_asn1", "jsonwebtoken", "pem_support"]}

@@ -10,15 +10,15 @@ pub enum StatusType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetDirectory {
     #[serde(rename = "newNonce")]
-    new_nonce: String,
+    pub new_nonce: String,
     #[serde(rename = "newAccount")]
-    new_account: String,
+    pub new_account: String,
     #[serde(rename = "newOrder")]
-    new_order: String,
+    pub new_order: String,
     #[serde(rename = "revokeCert")]
-    revoke_cert: String,
+    pub revoke_cert: String,
     #[serde(rename = "keyChange")]
-    key_change: String,
+    pub key_change: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

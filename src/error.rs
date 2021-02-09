@@ -68,6 +68,8 @@ pub enum Error {
     FromUrlParseError(url::ParseError),
     /// Error converted from an ErrorStack Error (occurs during RSA generation)
     FromRsaError(ErrorStack),
+    /// Error converted from a JWS error
+    FromJwsError(jws::Error),
 }
 
 impl From<std::str::Utf8Error> for Error {
@@ -91,5 +93,11 @@ impl From<url::ParseError> for Error {
 impl From<ErrorStack> for Error {
     fn from(error: ErrorStack) -> Self {
         Error::FromRsaError(error)
+    }
+}
+
+impl From<jws::Error> for Error {
+    fn from(error: jws::Error) -> Self {
+        Error::FromJwsError(error)
     }
 }
