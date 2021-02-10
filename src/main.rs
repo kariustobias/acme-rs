@@ -8,7 +8,7 @@ use openssl::pkey::PKey;
 use openssl::nid::Nid;
 use openssl::x509;
 use openssl::sign::Signer;
-use pkey::Public;
+use pkey::{PKeyRef, Public};
 use x509::{X509NameBuilder, X509Req, X509ReqBuilder};
 use reqwest::blocking::Client;
 use reqwest::Url;
@@ -38,9 +38,9 @@ fn main() {
         get_new_order(&client, new_nonce, get_dir.new_order, p_key, kid).unwrap()
     );
 
-    /**
-    let finalize_o = finalize_order(&client, new_nonce, order_url, p_key.clone()).unwrap();
-    */
+    
+    //let finalize_o = finalize_order(&client, new_nonce, order_url, p_key.clone()).unwrap();
+    
 }
 
 fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
@@ -123,12 +123,11 @@ fn get_new_order(
         .send())?
         .json()?)
 }
-
 fn finalize_order(client: &Client,
                   nonce: String,
                   url: String,
-                  p_key: Rsa<Private>,
-                  private_key: Rsa<Private>,
+                  p_key: PKeyRef<Public>,
+                  private_key: PKeyRef<Private>,
                   common_name: String,
                   kid: String,
 ) -> Result<String, Error> {
@@ -138,12 +137,13 @@ fn finalize_order(client: &Client,
         "kid": kid,
         "nonce": nonce,
     });
-
+    let csr = request_csr(p_key, private_key, common_name)
     let payload = json!({
-        "csr": request_csr(p_key, private_key, common_name),
+        "csr": csr
     });
 
-    let payload = jws(payload, header, p_kay)?;
+    let rsa = private_key.rsa().unwrap();
+    let payload = jws(payload, header, rsa);
 
     Ok(dbg!(client
         .post(&url)
