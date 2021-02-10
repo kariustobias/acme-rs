@@ -8,7 +8,7 @@ use openssl::pkey::PKey;
 use openssl::nid::Nid;
 use openssl::x509;
 use openssl::sign::Signer;
-use pkey::Public;
+use pkey::{Public};
 use x509::{X509NameBuilder, X509Req, X509ReqBuilder};
 use reqwest::blocking::Client;
 use reqwest::Url;
@@ -35,8 +35,18 @@ fn main() {
     let new_nonce = new_acc.1;
     println!(
         "{:?}",
-        get_new_order(&client, new_nonce, get_dir.new_order, p_key, kid).unwrap()
+        get_new_order(&client, new_nonce, get_dir.new_order, p_key.clone(), kid).unwrap()
     );
+
+    let csr = request_csr(p_key.clone(),IDENTIFIER.to_owned());
+    let mut csr_string =  String::from_utf8(csr.to_pem().unwrap()).unwrap();
+    let csr_string = csr_string.split("\n").into_iter();
+    
+    
+    
+    println!("{}", csr_string);
+
+    //let finalize_o = finalize_order(&client, new_nonce, order_url, p_key.clone()).unwrap();
 }
 
 fn get_directory(client: &Client) -> Result<Directory, Error> {
@@ -55,7 +65,7 @@ fn send_get_new_nonce(client: &Client, new_nonce_url: String) -> Result<String, 
             .ok_or(Error::BadNonce)?
             .as_bytes(),
     )?
-    .to_owned())
+        .to_owned())
 }
 
 fn get_new_account(
@@ -79,7 +89,7 @@ fn get_new_account(
     });
 
     let payload = jws(payload, header, p_key)?;
-    
+
     let response = dbg!(client
         .post(&url)
         .header("Content-Type", "application/jose+json")
@@ -94,7 +104,7 @@ fn get_new_order(
     nonce: String,
     url: String,
     p_key: Rsa<Private>,
-    kid: String
+    kid: String,
 ) -> Result<serde_json::Value, Error> {
     let header = json!({
         "alg": "RS256",
@@ -117,7 +127,40 @@ fn get_new_order(
         .header("Content-Type", "application/jose+json")
         .body(serde_json::to_string_pretty(&payload)?)
         .send())?
-    .json()?)
+        .json()?)
+}
+fn finalize_order(client: &Client,
+                  nonce: String,
+                  url: String,
+                  p_key: Rsa<Public>,
+                  private_key: Rsa<Private>,
+                  common_name: String,
+                  kid: String,
+) -> Result<String, Error> {
+    let header = json!({
+        "alg": "RS256",
+        "url": url,
+        "kid": kid,
+        "nonce": nonce,
+    });
+
+    let csr = request_csr(private_key.clone(), common_name.clone());
+    let csr_string =  String::from_utf8(csr.to_pem().unwrap()).unwrap();
+
+    println!("{}" , csr_string);
+
+    let payload = json!({
+        "csr": csr_string
+    });
+
+    let payload = jws(payload, header, private_key).unwrap();
+
+    Ok(dbg!(client
+        .post(&url)
+        .header("Content-Type", "application/jose+json")
+        .body(serde_json::to_string_pretty(&payload)?)
+        .send())?
+        .json()?)
 }
 
 fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
@@ -161,16 +204,18 @@ fn b64(to_encode: &[u8]) -> String {
     encode_config(to_encode, base64::URL_SAFE_NO_PAD)
 }
 
-#[allow(dead_code)]
-fn request_csr(pkey:pkey::PKeyRef<Public>, private_key:pkey::PKeyRef<Private>,common_name:String) -> X509Req{
+fn request_csr(private_key: Rsa<Private>, common_name: String) -> X509Req {
     let mut request = X509ReqBuilder::new().unwrap();
-    let mut c_name = X509NameBuilder::new().unwrap(); 
+    let mut c_name = X509NameBuilder::new().unwrap();
+
+    let pri_key = &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem().unwrap()).unwrap(); 
+    let public_key  = &openssl::pkey::PKey::public_key_from_pem(&private_key.public_key_to_pem().unwrap()).unwrap(); 
 
     c_name.append_entry_by_nid(Nid::COMMONNAME, &common_name).unwrap();
     let name = c_name.build();
-    request.set_pubkey(&pkey).unwrap();
+    request.set_pubkey(public_key).unwrap();
     request.set_subject_name(name.as_ref()).unwrap();
-    request.sign(&private_key,MessageDigest::sha256()).unwrap();
+    request.sign(pri_key, MessageDigest::sha256()).unwrap();
 
     request.build()
 }
