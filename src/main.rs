@@ -8,7 +8,7 @@ use openssl::pkey::PKey;
 use openssl::nid::Nid;
 use openssl::x509;
 use openssl::sign::Signer;
-use pkey::{PKeyRef, Public};
+use pkey::{Public};
 use x509::{X509NameBuilder, X509Req, X509ReqBuilder};
 use reqwest::blocking::Client;
 use reqwest::Url;
@@ -126,8 +126,8 @@ fn get_new_order(
 fn finalize_order(client: &Client,
                   nonce: String,
                   url: String,
-                  p_key: PKeyRef<Public>,
-                  private_key: PKeyRef<Private>,
+                  p_key: Rsa<Public>,
+                  private_key: Rsa<Private>,
                   common_name: String,
                   kid: String,
 ) -> Result<String, Error> {
@@ -137,14 +137,18 @@ fn finalize_order(client: &Client,
         "kid": kid,
         "nonce": nonce,
     });
-    let mut csr = request_csr(p_key, private_key, common_name);
-    let csrString =  String::from_utf8(csr.to_der().unwrap());
+
+
+    let csr = request_csr(private_key.clone(), common_name.clone());
+    let csr_string =  String::from_utf8(csr.to_pem().unwrap()).unwrap();
+    
+    println!("{}" , csr_string);
+
     let payload = json!({
-        "csr": csrString
+        "csr": csr_string
     });
 
-    let rsa = private_key.rsa().unwrap();
-    let payload = jws(payload, header, rsa);
+    let payload = jws(payload, header, private_key).unwrap();
 
     Ok(dbg!(client
         .post(&url)
@@ -196,15 +200,18 @@ fn b64(to_encode: &[u8]) -> String {
 }
 
 #[allow(dead_code)]
-fn request_csr(pkey: pkey::PKeyRef<Public>, private_key: pkey::PKeyRef<Private>, common_name: String) -> X509Req {
+fn request_csr(private_key: Rsa<Private>, common_name: String) -> X509Req {
     let mut request = X509ReqBuilder::new().unwrap();
     let mut c_name = X509NameBuilder::new().unwrap();
 
+    let pri_key = &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem().unwrap()).unwrap(); 
+    let public_key  = &openssl::pkey::PKey::private_key_from_pem(&private_key.public_key_to_pem().unwrap()).unwrap(); 
+
     c_name.append_entry_by_nid(Nid::COMMONNAME, &common_name).unwrap();
     let name = c_name.build();
-    request.set_pubkey(&pkey).unwrap();
+    request.set_pubkey(public_key).unwrap();
     request.set_subject_name(name.as_ref()).unwrap();
-    request.sign(&private_key, MessageDigest::sha256()).unwrap();
+    request.sign(pri_key, MessageDigest::sha256()).unwrap();
 
     request.build()
 }
