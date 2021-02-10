@@ -98,18 +98,14 @@ fn main() {
         &certificate
     );
 
-    let cert_me = certificate.lines().skip_while(|line| !line.is_empty()).map(|line| {
-        line.to_owned().push('\n');
-        line
-    }).collect::<String>();
-
-    let cert_other = certificate.lines().skip_while(|line| !line.is_empty()).map(|line| {
-        line.to_owned().push('\n');
-        line
+    let cert_me = certificate.lines().take_while(|line| !line.is_empty()).map(|line| {
+        let mut line_with_end = line.to_owned();
+        line_with_end.push_str("\r\n");
+        line_with_end
     }).collect::<String>();
 
     std::fs::write("me.cert", cert_me.into_bytes()).unwrap();
-    std::fs::write("other.cert", cert_other.into_bytes()).unwrap();
+    std::fs::write("other.cert", certificate.into_bytes()).unwrap();
 }
 
 fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
