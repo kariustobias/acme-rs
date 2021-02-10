@@ -1,6 +1,8 @@
 mod error;
 mod serialized_structs;
 
+use std::borrow::Borrow;
+
 use base64::encode_config;
 use error::Error;
 use openssl::{pkey::{self, Private}, rsa::{Padding, Rsa}};
@@ -16,19 +18,27 @@ use reqwest::Url;
 use serde_json::json;
 use serialized_structs::GetDirectory;
 
-
+const IDENTIFIER: &str = "cmbt.de";
 const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 const KEY_WIDTH: u32 = 2048;
 
 fn main() {
     let client = Client::new();
+    let p_key = generate_rsa_keypair().unwrap();
 
     let get_dir = get_directory(&client).unwrap();
     let new_nonce = send_get_new_nonce(&client, get_dir.new_nonce).unwrap();
 
+    let new_acc = get_new_account(&client, new_nonce, get_dir.new_account, p_key.clone()).unwrap();
     println!(
         "{:?}",
-        get_new_account(&client, new_nonce, get_dir.new_account).unwrap()
+        new_acc.2
+    );
+    let kid = dbg!(new_acc.0);
+    let new_nonce = new_acc.1;
+    println!(
+        "{:?}",
+        get_new_order(&client, new_nonce, get_dir.new_order, p_key, kid).unwrap()
     );
 }
 
@@ -51,9 +61,12 @@ fn send_get_new_nonce(client: &Client, new_nonce_url: String) -> Result<String, 
     .to_owned())
 }
 
-fn get_new_account(client: &Client, nonce: String, url: String) -> Result<String, Error> {
-    let p_key = generate_rsa_keypair()?;
-
+fn get_new_account(
+    client: &Client,
+    nonce: String,
+    url: String,
+    p_key: Rsa<Private>,
+) -> Result<(String, String, String), Error> {
     let jwk = jwk(p_key.clone())?;
 
     let header = json!({
@@ -69,13 +82,45 @@ fn get_new_account(client: &Client, nonce: String, url: String) -> Result<String
     });
 
     let payload = jws(payload, header, p_key)?;
+    
+    let response = dbg!(client
+        .post(&url)
+        .header("Content-Type", "application/jose+json")
+        .body(serde_json::to_string_pretty(&payload)?)
+        .send())?;
+
+    Ok((response.headers().get("location").unwrap().to_str().unwrap().to_owned(), response.headers().get("replay-nonce").unwrap().to_str().unwrap().to_owned(), response.text()?))
+}
+
+fn get_new_order(
+    client: &Client,
+    nonce: String,
+    url: String,
+    p_key: Rsa<Private>,
+    kid: String
+) -> Result<serde_json::Value, Error> {
+    let header = json!({
+        "alg": "RS256",
+        "url": url,
+        //"jwk": jwk,
+        "kid": kid,
+        "nonce": nonce,
+    });
+
+    let payload = json!({
+        "identifiers": [
+            { "type": "dns", "value": IDENTIFIER }
+        ]
+    });
+
+    let payload = jws(payload, header, p_key)?;
 
     Ok(dbg!(client
         .post(&url)
         .header("Content-Type", "application/jose+json")
         .body(serde_json::to_string_pretty(&payload)?)
         .send())?
-    .text()?)
+    .json()?)
 }
 
 fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
