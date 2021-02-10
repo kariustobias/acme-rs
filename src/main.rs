@@ -16,7 +16,7 @@ use reqwest::blocking::Client;
 use reqwest::Url;
 use rpki::cert;
 use serde_json::json;
-use serialized_structs::{Challenge, GetDirectory};
+use serialized_structs::{Challenge, Directory};
 use x509::{X509NameBuilder, X509Req, X509ReqBuilder};
 
 const IDENTIFIER: &str = "mb.cmbt.de";

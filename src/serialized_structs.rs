@@ -11,7 +11,7 @@ pub enum StatusType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GetDirectory {
+pub struct Directory {
 
     #[serde(rename = "newNonce")]
     pub new_nonce: String,
