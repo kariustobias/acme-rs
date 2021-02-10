@@ -13,7 +13,7 @@ use x509::{X509NameBuilder, X509Req, X509ReqBuilder};
 use reqwest::blocking::Client;
 use reqwest::Url;
 use serde_json::json;
-use serialized_structs::GetDirectory;
+use serialized_structs::{Directory};
 
 const IDENTIFIER: &str = "cmbt.de";
 const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
@@ -49,7 +49,7 @@ fn main() {
     //let finalize_o = finalize_order(&client, new_nonce, order_url, p_key.clone()).unwrap();
 }
 
-fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
+fn get_directory(client: &Client) -> Result<Directory, Error> {
     let url = Url::parse(SERVER)?;
     Ok(client.get(url).send()?.json()?)
 }
@@ -204,7 +204,6 @@ fn b64(to_encode: &[u8]) -> String {
     encode_config(to_encode, base64::URL_SAFE_NO_PAD)
 }
 
-#[allow(dead_code)]
 fn request_csr(private_key: Rsa<Private>, common_name: String) -> X509Req {
     let mut request = X509ReqBuilder::new().unwrap();
     let mut c_name = X509NameBuilder::new().unwrap();
