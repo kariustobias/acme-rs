@@ -37,6 +37,10 @@ fn main() {
         "{:?}",
         get_new_order(&client, new_nonce, get_dir.new_order, p_key, kid).unwrap()
     );
+
+    /**
+    let finalize_o = finalize_order(&client, new_nonce, order_url, p_key.clone()).unwrap();
+    */
 }
 
 fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
@@ -55,7 +59,7 @@ fn send_get_new_nonce(client: &Client, new_nonce_url: String) -> Result<String, 
             .ok_or(Error::BadNonce)?
             .as_bytes(),
     )?
-    .to_owned())
+        .to_owned())
 }
 
 fn get_new_account(
@@ -79,7 +83,7 @@ fn get_new_account(
     });
 
     let payload = jws(payload, header, p_key)?;
-    
+
     let response = dbg!(client
         .post(&url)
         .header("Content-Type", "application/jose+json")
@@ -94,7 +98,7 @@ fn get_new_order(
     nonce: String,
     url: String,
     p_key: Rsa<Private>,
-    kid: String
+    kid: String,
 ) -> Result<serde_json::Value, Error> {
     let header = json!({
         "alg": "RS256",
@@ -117,7 +121,36 @@ fn get_new_order(
         .header("Content-Type", "application/jose+json")
         .body(serde_json::to_string_pretty(&payload)?)
         .send())?
-    .json()?)
+        .json()?)
+}
+
+fn finalize_order(client: &Client,
+                  nonce: String,
+                  url: String,
+                  p_key: Rsa<Private>,
+                  private_key: Rsa<Private>,
+                  common_name: String,
+                  kid: String,
+) -> Result<String, Error> {
+    let header = json!({
+        "alg": "RS256",
+        "url": url,
+        "kid": kid,
+        "nonce": nonce,
+    });
+
+    let payload = json!({
+        "csr": request_csr(p_key, private_key, common_name),
+    });
+
+    let payload = jws(payload, header, p_kay)?;
+
+    Ok(dbg!(client
+        .post(&url)
+        .header("Content-Type", "application/jose+json")
+        .body(serde_json::to_string_pretty(&payload)?)
+        .send())?
+        .json()?)
 }
 
 fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
@@ -162,15 +195,15 @@ fn b64(to_encode: &[u8]) -> String {
 }
 
 #[allow(dead_code)]
-fn request_csr(pkey:pkey::PKeyRef<Public>, private_key:pkey::PKeyRef<Private>,common_namee:String) -> X509Req{
+fn request_csr(pkey: pkey::PKeyRef<Public>, private_key: pkey::PKeyRef<Private>, common_name: String) -> X509Req {
     let mut request = X509ReqBuilder::new().unwrap();
-    let mut c_name = X509NameBuilder::new().unwrap(); 
+    let mut c_name = X509NameBuilder::new().unwrap();
 
-    c_name.append_entry_by_nid(Nid::COMMONNAME, &common_namee).unwrap();
+    c_name.append_entry_by_nid(Nid::COMMONNAME, &common_name).unwrap();
     let name = c_name.build();
     request.set_pubkey(&pkey).unwrap();
     request.set_subject_name(name.as_ref()).unwrap();
-    request.sign(&private_key,MessageDigest::sha256()).unwrap();
+    request.sign(&private_key, MessageDigest::sha256()).unwrap();
 
     request.build()
 }
