@@ -1,8 +1,6 @@
 mod error;
 mod serialized_structs;
 
-use std::ops::Add;
-
 use base64::encode_config;
 use error::Error;
 use openssl::pkey::PKey;
@@ -10,13 +8,13 @@ use openssl::sign::Signer;
 use openssl::x509;
 use openssl::{
     hash::MessageDigest,
-    pkey::{self, Private},
+    pkey::Private,
     rsa::{Padding, Rsa},
 };
 use openssl::{nid::Nid, sha::Sha256};
-use pkey::Public;
 use reqwest::blocking::Client;
 use reqwest::Url;
+use rpki::cert;
 use serde_json::json;
 use serialized_structs::{Challenge, GetDirectory};
 use x509::{X509NameBuilder, X509Req, X509ReqBuilder};
@@ -83,10 +81,21 @@ fn main() {
     let mut finalize_url = order.1.get("finalize").unwrap().to_string();
     finalize_url.pop();
     finalize_url.remove(0);
+
+    let finalized_cert = finalize_order(&client, new_nonce, finalize_url, p_key.clone(), new_acc.clone().0).unwrap();
     println!(
         "{:?}",
-        finalize_order(&client, new_nonce, finalize_url, p_key, new_acc.0).unwrap()
-    )
+        finalized_cert.1,
+    );
+    let new_nonce = finalized_cert.0;
+    let mut cert_url = finalized_cert.1.get("certificate").unwrap().to_string();
+    cert_url.pop();
+    cert_url.remove(0);
+
+    println!(
+        "{}", 
+        download_certificate(&client, new_nonce, cert_url, new_acc.0, p_key).unwrap()
+    );
 }
 
 fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
@@ -359,14 +368,14 @@ fn finalize_order(
     url: String,
     private_key: Rsa<Private>,
     kid: String,
-) -> Result<serde_json::Value, Error> {
+) -> Result<(String, serde_json::Value), Error> {
     let header = json!({
     "alg": "RS256",
     "url": url,
     "kid": kid,
     "nonce": nonce,
     });
-   
+
     let csr_key = generate_rsa_keypair()?;
     let csr = request_csr(csr_key.clone(), IDENTIFIER.to_owned());
     let csr_string = b64(&csr.to_der().unwrap());
@@ -377,12 +386,41 @@ fn finalize_order(
 
     let jws = jws(payload, header, private_key, false).unwrap();
 
-    Ok(dbg!(client
+    let response = dbg!(client
         .post(&url)
+        .header("Content-Type", "application/jose+json")
+        .header("Accept", "application/pem-certificate-chain")
+        .body(serde_json::to_string_pretty(&jws)?)
+        .send())?;
+    Ok((
+        response
+            .headers()
+            .get("replay-nonce")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned(),
+        response.json()?,
+    ))
+}
+
+fn download_certificate(client: &Client, nonce: String, cert_url: String, acct_url: String, private_key: Rsa<Private>) -> Result<String, Error> {
+    let header = json!({
+        "alg": "RS256",
+        "url": cert_url,
+        "kid": acct_url,
+        "nonce": dbg!(nonce),
+    });
+    let payload = json!("");
+
+    let jws = dbg!(jws(payload, header, private_key, true)?);
+
+    Ok(dbg!(client
+        .post(&cert_url)
         .header("Content-Type", "application/jose+json")
         .body(serde_json::to_string_pretty(&jws)?)
         .send())?
-    .json()?)
+    .text()?)
 }
 
 fn request_csr(private_key: Rsa<Private>, common_name: String) -> X509Req {
