@@ -108,7 +108,7 @@ fn main() {
     std::fs::write("other.cert", certificate.into_bytes()).unwrap();
 }
 
-fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
+fn get_directory(client: &Client) -> Result<Directory, Error> {
     let url = Url::parse(SERVER)?;
     Ok(client.get(url).send()?.json()?)
 }
@@ -124,7 +124,7 @@ fn send_get_new_nonce(client: &Client, new_nonce_url: String) -> Result<String, 
             .ok_or(Error::BadNonce)?
             .as_bytes(),
     )?
-    .to_owned())
+        .to_owned())
 }
 
 fn get_new_account(
@@ -181,6 +181,7 @@ fn get_new_order(
     p_key: Rsa<Private>,
     kid: String,
 ) -> Result<(String, serde_json::Value), Error> {
+
     let header = json!({
         "alg": "RS256",
         "url": url,
