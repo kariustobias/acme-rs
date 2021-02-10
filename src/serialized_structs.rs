@@ -13,7 +13,7 @@ pub struct Directory {
     pub revoke_cert: String,
     #[serde(rename="keyChange")]
     pub key_change: String,
-    pub meta: Vec<serde_json::Value>,
+   // pub meta: Vec<serde_json::Value>,
     //optional termsOfService : URL
     //optional website : URL
     //optional caaIdentities : [URL]
