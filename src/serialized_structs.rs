@@ -24,9 +24,9 @@ pub struct Directory {
 pub struct AccountManagment{
     //Page 34
     contact: Option<Vec<String>>,
-    terms_Of_Service_Agreed: Option<bool>,
+    terms_of_service_agreed: Option<bool>,
     only_return_existing: Option<bool>,
-    external_Account_Binding: Option<serde_json::Value>,
+    external_account_binding: Option<serde_json::Value>,
     payload: (bool, serde_json::Value),
     protected: serde_json::Value,
     signature: String,
@@ -37,8 +37,8 @@ pub struct Account {
     //Page 24
     status: String,
     contact: Option<Vec<String>>,
-    terms_Of_Service_Agreed: Option<bool>,
-    external_Account_Binding: serde_json::Value, // Including this field in a
+    terms_of_service_agreed: Option<bool>,
+    external_account_binding: serde_json::Value, // Including this field in a
     //newAccount request indicates approval by the holder of an existing
     //non-ACME account to bind that account to this ACME account.  This
     //field is not updateable by the client (see Section 7.3.4).
@@ -49,8 +49,8 @@ pub struct Account {
 pub struct NewOrder {
     //Page 44
     identifiers: serde_json::Value,
-    not_After: Option<String>,
-    not_Before: Option<String>,
+    not_after: Option<String>,
+    not_before: Option<String>,
     payload: serde_json::Value,
     protected: serde_json::Value,
     signature: serde_json::Value,
