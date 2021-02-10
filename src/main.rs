@@ -5,7 +5,6 @@ use std::ops::Add;
 
 use base64::encode_config;
 use error::Error;
-use openssl::{nid::Nid, sha::Sha256};
 use openssl::pkey::PKey;
 use openssl::sign::Signer;
 use openssl::x509;
@@ -14,6 +13,7 @@ use openssl::{
     pkey::{self, Private},
     rsa::{Padding, Rsa},
 };
+use openssl::{nid::Nid, sha::Sha256};
 use pkey::Public;
 use reqwest::blocking::Client;
 use reqwest::Url;
@@ -53,16 +53,40 @@ fn main() {
     auth_url.pop();
     auth_url.remove(0);
 
-    let chall = get_authorisation(&client, new_nonce, dbg!(auth_url), new_acc.clone().0, p_key.clone()).unwrap();
-    println!(
-        "{:#?}",
-        chall.1
-    );
+    let chall = get_authorisation(
+        &client,
+        new_nonce,
+        dbg!(auth_url),
+        new_acc.clone().0,
+        p_key.clone(),
+    )
+    .unwrap();
+    println!("{:#?}", chall.1);
     let new_nonce = chall.0;
 
-    let http_challenge = dbg!(chall.1.challenges.into_iter().find(|challenge| challenge.challenge_type == "http-01").unwrap());
-    complete_http_challenge(&client, http_challenge, new_nonce,new_acc.0.split("/").last().unwrap().to_owned() , new_acc.0, p_key).unwrap();
+    let http_challenge = dbg!(chall
+        .1
+        .challenges
+        .into_iter()
+        .find(|challenge| challenge.challenge_type == "http-01")
+        .unwrap());
+    let new_nonce = complete_http_challenge(
+        &client,
+        http_challenge,
+        new_nonce.clone(),
+        new_acc.0.split("/").last().unwrap().to_owned(),
+        new_acc.clone().0,
+        p_key.clone(),
+    )
+    .unwrap();
 
+    let mut finalize_url = order.1.get("finalize").unwrap().to_string();
+    finalize_url.pop();
+    finalize_url.remove(0);
+    println!(
+        "{:?}",
+        finalize_order(&client, new_nonce, finalize_url, p_key, new_acc.0).unwrap()
+    )
 }
 
 fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
@@ -205,18 +229,33 @@ fn get_authorisation(
     ))
 }
 
-fn complete_http_challenge(client: &Client, challenge_infos: Challenge, nonce: String, account_key: String, acc_url: String, private_key: Rsa<Private>) -> Result<(), Error> {
+fn complete_http_challenge(
+    client: &Client,
+    challenge_infos: Challenge,
+    nonce: String,
+    account_key: String,
+    acc_url: String,
+    private_key: Rsa<Private>,
+) -> Result<String, Error> {
     let thumbprint = jwk(private_key.clone())?;
     let mut hasher = Sha256::new();
     hasher.update(&thumbprint.to_string().into_bytes());
     let thumbprint = hasher.finish();
 
     let challenge_content = format!("{}.{}", challenge_infos.token, b64(&thumbprint));
-    
-    kick_off_http_chall(client, challenge_infos.clone(), nonce, acc_url, private_key.clone()).unwrap();
+
+    let result = kick_off_http_chall(
+        client,
+        challenge_infos.clone(),
+        nonce,
+        acc_url,
+        private_key.clone(),
+    )
+    .unwrap();
     std::thread::spawn(|| {
         rouille::start_server("0.0.0.0:80", move |request| {
-            if request.raw_url() == format!("/.well-known/acme-challenge/{}", challenge_infos.token) {
+            if request.raw_url() == format!("/.well-known/acme-challenge/{}", challenge_infos.token)
+            {
                 println!("Got Request!");
                 rouille::Response::text(challenge_content.clone())
             } else {
@@ -225,10 +264,16 @@ fn complete_http_challenge(client: &Client, challenge_infos: Challenge, nonce: S
         });
     });
 
-    Ok(())
+    Ok(result)
 }
 
-fn kick_off_http_chall(client: &Client, challenge_infos: Challenge, nonce: String, acc_url: String, private_key: Rsa<Private>) -> Result<(), Error> {
+fn kick_off_http_chall(
+    client: &Client,
+    challenge_infos: Challenge,
+    nonce: String,
+    acc_url: String,
+    private_key: Rsa<Private>,
+) -> Result<String, Error> {
     let header = json!({
         "alg": "RS256",
         "kid": acc_url,
@@ -240,13 +285,17 @@ fn kick_off_http_chall(client: &Client, challenge_infos: Challenge, nonce: Strin
 
     let jws = jws(payload, header, private_key, false)?;
 
-    dbg!(client
+    Ok(dbg!(client
         .post(&challenge_infos.url)
         .header("Content-Type", "application/jose+json")
         .body(serde_json::to_string_pretty(&jws)?)
-        .send())?;
-
-    Ok(())
+        .send())?
+    .headers()
+    .get("replay-nonce")
+    .unwrap()
+    .to_str()
+    .unwrap()
+    .to_owned())
 }
 
 fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
@@ -304,22 +353,61 @@ fn b64(to_encode: &[u8]) -> String {
     encode_config(to_encode, base64::URL_SAFE_NO_PAD)
 }
 
-#[allow(dead_code)]
-fn request_csr(
-    pkey: pkey::PKeyRef<Public>,
-    private_key: pkey::PKeyRef<Private>,
-    common_namee: String,
-) -> X509Req {
+fn finalize_order(
+    client: &Client,
+    nonce: String,
+    url: String,
+    private_key: Rsa<Private>,
+    kid: String,
+) -> Result<serde_json::Value, Error> {
+    let header = json!({
+    "alg": "RS256",
+    "url": url,
+    "kid": kid,
+    "nonce": nonce,
+    });
+
+    let csr = request_csr(private_key.clone(), IDENTIFIER.to_owned());
+    let csr_string = String::from_utf8(csr.to_pem().unwrap()).unwrap();
+    let csr_iter = csr_string.lines();
+    let csr_string = csr_iter
+        .clone()
+        .skip(1)
+        .take(csr_iter.count() - 2)
+        .collect::<String>();
+
+    println!("{}", csr_string);
+
+    let payload = json!({ "csr": csr_string });
+
+    let payload = jws(payload, header, private_key, false).unwrap();
+
+    Ok(dbg!(client
+        .post(&url)
+        .header("Content-Type", "application/jose+json")
+        .body(serde_json::to_string_pretty(&payload)?)
+        .send())?
+    .json()?)
+}
+
+fn request_csr(private_key: Rsa<Private>, common_name: String) -> X509Req {
     let mut request = X509ReqBuilder::new().unwrap();
     let mut c_name = X509NameBuilder::new().unwrap();
 
+    let pri_key =
+        &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem().unwrap())
+            .unwrap();
+    let public_key =
+        &openssl::pkey::PKey::public_key_from_pem(&private_key.public_key_to_pem().unwrap())
+            .unwrap();
+
     c_name
-        .append_entry_by_nid(Nid::COMMONNAME, &common_namee)
+        .append_entry_by_nid(Nid::COMMONNAME, &common_name)
         .unwrap();
     let name = c_name.build();
-    request.set_pubkey(&pkey).unwrap();
+    request.set_pubkey(public_key).unwrap();
     request.set_subject_name(name.as_ref()).unwrap();
-    request.sign(&private_key, MessageDigest::sha256()).unwrap();
+    request.sign(pri_key, MessageDigest::sha256()).unwrap();
 
     request.build()
 }
