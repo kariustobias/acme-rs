@@ -137,7 +137,8 @@ fn finalize_order(client: &Client,
         "kid": kid,
         "nonce": nonce,
     });
-    let csr = request_csr(p_key, private_key, common_name)
+    
+    let csr = request_csr(p_key, private_key, common_name);
     let payload = json!({
         "csr": csr
     });
