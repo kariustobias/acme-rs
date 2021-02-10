@@ -1,18 +1,15 @@
 mod error;
 mod serialized_structs;
 
-use std::borrow::Borrow;
-
 use base64::encode_config;
 use error::Error;
-use openssl::{pkey::{self, Private}, rsa::{Padding, Rsa}};
-use openssl::x509::{X509, X509Name};
+use openssl::{pkey::{self, Private}, rsa::{Padding, Rsa}, hash::MessageDigest};
 use openssl::pkey::PKey;
 use openssl::nid::Nid;
 use openssl::x509;
 use openssl::sign::Signer;
 use pkey::Public;
-use x509::{X509NameBuilder, X509NameRef, X509Req, X509ReqBuilder};
+use x509::{X509NameBuilder, X509Req, X509ReqBuilder};
 use reqwest::blocking::Client;
 use reqwest::Url;
 use serde_json::json;
@@ -164,14 +161,16 @@ fn b64(to_encode: &[u8]) -> String {
     encode_config(to_encode, base64::URL_SAFE_NO_PAD)
 }
 
-fn request_CSR(pkey:pkey::PKeyRef<Public>, privateKey:pkey::PKeyRef<Private>, commonName:String) -> X509Req{
+#[allow(dead_code)]
+fn request_csr(pkey:pkey::PKeyRef<Public>, private_key:pkey::PKeyRef<Private>,common_namee:String) -> X509Req{
     let mut request = X509ReqBuilder::new().unwrap();
-    let mut cName = X509NameBuilder::new().unwrap(); 
+    let mut c_name = X509NameBuilder::new().unwrap(); 
 
-    cName.append_entry_by_nid(Nid::COMMONNAME, &commonName);
-    let name = cName.build();
-    request.set_pubkey(&pkey);
-    request.set_subject_name(name.as_ref());
-    request.sign(&privateKey,MessageDigest::sha256()).unwrap();
-    return request.build();
+    c_name.append_entry_by_nid(Nid::COMMONNAME, &common_namee).unwrap();
+    let name = c_name.build();
+    request.set_pubkey(&pkey).unwrap();
+    request.set_subject_name(name.as_ref()).unwrap();
+    request.sign(&private_key,MessageDigest::sha256()).unwrap();
+
+    request.build()
 }
