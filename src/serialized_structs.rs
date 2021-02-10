@@ -1,8 +1,18 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum StatusType {
+    #[serde(rename = "valid")]
+    Valid,
+    #[serde(rename = "pending")]
+    Pending,
+    #[serde(rename = "invalid")]
+    Invalid,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Directory {
-    //Page 23
+pub struct GetDirectory {
+
     #[serde(rename = "newNonce")]
     pub new_nonce: String,
     #[serde(rename = "newAccount")]
@@ -80,23 +90,23 @@ pub struct SendAuthorisation {
     signature: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Authorization {
-    //Page 28
-    // type, value
-    identifier: serde_json::Value,
-    status: String,
-    expires: Option<String>,
-    challenges: serde_json::Value,
-    wildcard: Option<bool>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Challenge {
+    pub status: StatusType,
+    pub token: String,
+    #[serde(rename = "type")]
+    pub challenge_type: String,
+    pub url: String,
 }
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Challange{
-    //Page 60
-    url:String,
-    status:String,
-    validated:Option<String>,
-    error:Option<serde_json::Value>
+pub struct ChallengeAuthorisation {
+    // type, value
+    pub identifier: serde_json::Value,
+    pub status: StatusType,
+    pub expires: String,
+    pub challenges: Vec<Challenge>,
+    pub wildcard: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -127,7 +137,8 @@ struct GetCertificate {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Certificate {}
+struct Certificate {
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Conformation {
