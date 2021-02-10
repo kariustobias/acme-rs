@@ -13,3 +13,5 @@ reqwest = { version = "0.11", features = ["blocking", "json"] }
 url = "2.2.0"
 openssl = { version = "0.10", features = ["vendored"] }
 rpki = "0.10.0"
+base64 = "0.13.0"
+rouille = "3.0.0"
