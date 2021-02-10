@@ -35,12 +35,18 @@ fn main() {
     let new_nonce = new_acc.1;
     println!(
         "{:?}",
-        get_new_order(&client, new_nonce, get_dir.new_order, p_key, kid).unwrap()
+        get_new_order(&client, new_nonce, get_dir.new_order, p_key.clone(), kid).unwrap()
     );
 
+    let csr = request_csr(p_key.clone(),IDENTIFIER.to_owned());
+    let mut csr_string =  String::from_utf8(csr.to_pem().unwrap()).unwrap();
+    let csr_string = csr_string.split("\n").into_iter();
     
+    
+    
+    println!("{}", csr_string);
+
     //let finalize_o = finalize_order(&client, new_nonce, order_url, p_key.clone()).unwrap();
-    
 }
 
 fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
@@ -138,10 +144,9 @@ fn finalize_order(client: &Client,
         "nonce": nonce,
     });
 
-
     let csr = request_csr(private_key.clone(), common_name.clone());
     let csr_string =  String::from_utf8(csr.to_pem().unwrap()).unwrap();
-    
+
     println!("{}" , csr_string);
 
     let payload = json!({
@@ -205,7 +210,7 @@ fn request_csr(private_key: Rsa<Private>, common_name: String) -> X509Req {
     let mut c_name = X509NameBuilder::new().unwrap();
 
     let pri_key = &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem().unwrap()).unwrap(); 
-    let public_key  = &openssl::pkey::PKey::private_key_from_pem(&private_key.public_key_to_pem().unwrap()).unwrap(); 
+    let public_key  = &openssl::pkey::PKey::public_key_from_pem(&private_key.public_key_to_pem().unwrap()).unwrap(); 
 
     c_name.append_entry_by_nid(Nid::COMMONNAME, &common_name).unwrap();
     let name = c_name.build();
