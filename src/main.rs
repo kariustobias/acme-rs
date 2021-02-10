@@ -137,10 +137,10 @@ fn finalize_order(client: &Client,
         "kid": kid,
         "nonce": nonce,
     });
-    
-    let csr = request_csr(p_key, private_key, common_name);
+    let mut csr = request_csr(p_key, private_key, common_name);
+    let csrString =  String::from_utf8(csr.to_der().unwrap());
     let payload = json!({
-        "csr": csr
+        "csr": csrString
     });
 
     let rsa = private_key.rsa().unwrap();
