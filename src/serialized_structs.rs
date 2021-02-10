@@ -109,7 +109,8 @@ struct GetCertificate {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Certificate {}
+struct Certificate {
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Conformation {

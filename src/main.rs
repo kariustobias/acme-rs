@@ -92,10 +92,24 @@ fn main() {
     cert_url.pop();
     cert_url.remove(0);
 
+    let certificate = download_certificate(&client, new_nonce, cert_url, new_acc.0, p_key).unwrap();
     println!(
         "{}", 
-        download_certificate(&client, new_nonce, cert_url, new_acc.0, p_key).unwrap()
+        &certificate
     );
+
+    let cert_me = certificate.lines().skip_while(|line| !line.is_empty()).map(|line| {
+        line.to_owned().push('\n');
+        line
+    }).collect::<String>();
+
+    let cert_other = certificate.lines().skip_while(|line| !line.is_empty()).map(|line| {
+        line.to_owned().push('\n');
+        line
+    }).collect::<String>();
+
+    std::fs::write("me.cert", cert_me.into_bytes()).unwrap();
+    std::fs::write("other.cert", cert_other.into_bytes()).unwrap();
 }
 
 fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
