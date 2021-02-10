@@ -214,15 +214,18 @@ fn complete_http_challenge(client: &Client, challenge_infos: Challenge, nonce: S
     let challenge_content = format!("{}.{}", challenge_infos.token, b64(&thumbprint));
     
     kick_off_http_chall(client, challenge_infos.clone(), nonce, acc_url, private_key.clone()).unwrap();
-
-    rouille::start_server("0.0.0.0:80", move |request| {
-        if request.raw_url() == format!("/.well-known/acme-challenge/{}", challenge_infos.token) {
-            println!("Got Request!");
-            rouille::Response::text(challenge_content.clone())
-        } else {
-            rouille::Response::empty_404()
-        }
+    std::thread::spawn(|| {
+        rouille::start_server("0.0.0.0:80", move |request| {
+            if request.raw_url() == format!("/.well-known/acme-challenge/{}", challenge_infos.token) {
+                println!("Got Request!");
+                rouille::Response::text(challenge_content.clone())
+            } else {
+                rouille::Response::empty_404()
+            }
+        });
     });
+
+    Ok(())
 }
 
 fn kick_off_http_chall(client: &Client, challenge_infos: Challenge, nonce: String, acc_url: String, private_key: Rsa<Private>) -> Result<(), Error> {
