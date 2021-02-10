@@ -1,9 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum StatusType {
+    #[serde(rename = "valid")]
     Valid,
+    #[serde(rename = "pending")]
     Pending,
+    #[serde(rename = "invalid")]
     Invalid,
 }
 
@@ -60,14 +63,23 @@ struct Authorisation {
     signature: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Challenge {
+    pub status: StatusType,
+    pub token: String,
+    #[serde(rename = "type")]
+    pub challenge_type: String,
+    pub url: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-struct ChallengeAuthorisation {
+pub struct ChallengeAuthorisation {
     // type, value
-    identifier: serde_json::Value,
-    status: StatusType,
-    expires: String,
-    challenges: serde_json::Value,
-    wildcard: bool,
+    pub identifier: serde_json::Value,
+    pub status: StatusType,
+    pub expires: String,
+    pub challenges: Vec<Challenge>,
+    pub wildcard: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
