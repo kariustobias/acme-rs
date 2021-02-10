@@ -11,16 +11,18 @@ mod error;
 mod serialized_structs;
 mod signer;
 
+use base64::encode_config;
 use error::Error;
-use openssl::{pkey::Private, rsa::{Padding, Rsa}};
+use openssl::{
+    hash::MessageDigest,
+    pkey::{PKey, Private},
+    rsa::{Padding, Rsa},
+    sign::Signer,
+};
 use reqwest::blocking::Client;
 use reqwest::Url;
 use serde_json::json;
-use jsonwebkey_convert::*;
-use jsonwebkey_convert::der::FromPem;
 use serialized_structs::{AccountCreated, GetDirectory};
-use jws::{JsonObject, compact::{EncodedSignedMessage, encode_sign}};
-use jws::hmac::{Hs512Signer};
 
 const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 #[allow(dead_code)]
@@ -33,7 +35,10 @@ fn main() {
     let get_dir = get_directory(&client).unwrap();
     let new_nonce = send_get_new_nonce(&client, get_dir.new_nonce).unwrap();
 
-    println!("{:?}", post_get_new_account(&client, "mb.cmbt.de", new_nonce).unwrap());
+    println!(
+        "{:?}",
+        post_get_new_account(&client, new_nonce).unwrap()
+    );
 }
 
 fn get_directory(client: &Client) -> Result<GetDirectory, Error> {
@@ -58,45 +63,73 @@ fn send_get_new_nonce(client: &Client, new_nonce_url: String) -> Result<String, 
 
 fn post_get_new_account(
     client: &Client,
-    url_to_register: &str,
     nonce: String,
 ) -> Result<String, Error> {
     let p_key = generate_rsa_keypair()?;
 
-    let rsa_jwk = RSAPublicKey::from_pem(p_key.public_key_to_pem()?).unwrap();
-    let jwk_byte_vec = dbg!(serde_json::to_string(&rsa_jwk).unwrap());
+    let jwk = jwk(p_key.clone())?;
 
-    let mut jws_header = JsonObject::new();
-    jws_header.insert("url".to_owned(), json!("https://acme/new-acct"));
-    jws_header.insert("nonce".to_owned(), json!(nonce));
-    jws_header.insert("jwk".to_owned(), json!(jwk_byte_vec));
-    
+    let header = json!({
+        "alg": "RS256",
+        "url": "https://acme-staging-v02.api.letsencrypt.org/acme/new-acct",
+        "jwk": jwk,
+        "nonce": nonce,
+    });
+
     let payload = json!({
         "termsOfServiceAgreed": true,
         "contact": ["mailto:bastian@cmbt.de"]
     });
-        
-    
-    let jws_payload = sign_payload_via_jws(payload, p_key, jws_header)?;
-    let payload_for_real = json!({
-        "payload": jws_payload.payload(),
-        "protected": jws_payload.header(),
-        "signature": jws_payload.signature()
-    });
+
+    let payload = jws(payload, header, p_key)?;
 
     Ok(dbg!(client
         .post(ACCOUNT)
         .header("Content-Type", "application/jose+json")
-        .body(payload_for_real.to_string())
+        .body(serde_json::to_string_pretty(&payload).unwrap())
         .send())?
-        .text()?)
+    .text()?)
 }
 
 fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
     Ok(Rsa::generate(KEY_WIDTH)?)
 }
 
-fn sign_payload_via_jws(payload: serde_json::Value, private_key: Rsa<Private>, header: JsonObject) -> Result<EncodedSignedMessage, Error> {
-    let signer = signer::RS256Signer::new(private_key);
-    Ok(encode_sign(header, &payload.to_string().into_bytes(), &signer)?)
+fn jwk(private_key: Rsa<Private>) -> Result<serde_json::Value, Error> {
+    let e = base64::encode_config(&private_key.e().to_vec(), base64::URL_SAFE_NO_PAD);
+    let n = base64::encode_config(&private_key.n().to_vec(), base64::URL_SAFE_NO_PAD);
+
+    Ok(json!({
+        "e": e,
+        "n": n,
+        "kty": "RSA",
+    }))
+}
+
+fn jws(
+    payload: serde_json::Value,
+    header: serde_json::Value,
+    private_key: Rsa<Private>,
+) -> Result<serde_json::Value, Error> {
+    let payload64 = base64::encode_config(
+        serde_json::to_string_pretty(&payload).unwrap().as_bytes(),
+        base64::URL_SAFE_NO_PAD,
+    );
+    let header64 = base64::encode_config(
+        serde_json::to_string_pretty(&header).unwrap(),
+        base64::URL_SAFE_NO_PAD,
+    );
+
+    let p_key = PKey::private_key_from_pem(&private_key.private_key_to_pem()?)?;
+    let mut signer = Signer::new(MessageDigest::sha256(), &p_key)?;
+
+    signer.set_rsa_padding(Padding::PKCS1)?;
+    signer.update(&format!("{}.{}", header64, payload64).as_bytes())?;
+    let signature = base64::encode_config(&signer.sign_to_vec()?, base64::URL_SAFE_NO_PAD);
+
+    Ok(json!({
+        "protected": header64,
+        "payload": payload64,
+        "signature": signature
+    }))
 }
