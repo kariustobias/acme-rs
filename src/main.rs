@@ -5,12 +5,14 @@ use std::borrow::Borrow;
 
 use base64::encode_config;
 use error::Error;
-use openssl::{
-    hash::MessageDigest,
-    pkey::{PKey, Private},
-    rsa::{Padding, Rsa},
-    sign::Signer,
-};
+use openssl::{pkey::{self, Private}, rsa::{Padding, Rsa}};
+use openssl::x509::{X509, X509Name};
+use openssl::pkey::PKey;
+use openssl::nid::Nid;
+use openssl::x509;
+use openssl::sign::Signer;
+use pkey::Public;
+use x509::{X509NameBuilder, X509NameRef, X509Req, X509ReqBuilder};
 use reqwest::blocking::Client;
 use reqwest::Url;
 use serde_json::json;
@@ -160,4 +162,16 @@ fn jws(
 
 fn b64(to_encode: &[u8]) -> String {
     encode_config(to_encode, base64::URL_SAFE_NO_PAD)
+}
+
+fn request_CSR(pkey:pkey::PKeyRef<Public>, privateKey:pkey::PKeyRef<Private>, commonName:String) -> X509Req{
+    let mut request = X509ReqBuilder::new().unwrap();
+    let mut cName = X509NameBuilder::new().unwrap(); 
+
+    cName.append_entry_by_nid(Nid::COMMONNAME, &commonName);
+    let name = cName.build();
+    request.set_pubkey(&pkey);
+    request.set_subject_name(name.as_ref());
+    request.sign(&privateKey,MessageDigest::sha256()).unwrap();
+    return request.build();
 }
