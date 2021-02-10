@@ -263,7 +263,7 @@ fn complete_http_challenge(
             }
         });
     });
-
+    std::thread::sleep(std::time::Duration::from_secs(5));
     Ok(result)
 }
 
@@ -366,26 +366,21 @@ fn finalize_order(
     "kid": kid,
     "nonce": nonce,
     });
-
-    let csr = request_csr(private_key.clone(), IDENTIFIER.to_owned());
-    let csr_string = String::from_utf8(csr.to_pem().unwrap()).unwrap();
-    let csr_iter = csr_string.lines();
-    let csr_string = csr_iter
-        .clone()
-        .skip(1)
-        .take(csr_iter.count() - 2)
-        .collect::<String>();
+   
+    let csr_key = generate_rsa_keypair()?;
+    let csr = request_csr(csr_key.clone(), IDENTIFIER.to_owned());
+    let csr_string = b64(&csr.to_der().unwrap());
 
     println!("{}", csr_string);
 
     let payload = json!({ "csr": csr_string });
 
-    let payload = jws(payload, header, private_key, false).unwrap();
+    let jws = jws(payload, header, private_key, false).unwrap();
 
     Ok(dbg!(client
         .post(&url)
         .header("Content-Type", "application/jose+json")
-        .body(serde_json::to_string_pretty(&payload)?)
+        .body(serde_json::to_string_pretty(&jws)?)
         .send())?
     .json()?)
 }
