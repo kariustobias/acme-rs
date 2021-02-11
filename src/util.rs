@@ -1,7 +1,7 @@
 use base64::encode_config;
 use openssl::{
     hash::MessageDigest,
-    pkey::{PKey, Private},
+    pkey::{PKey, Private, Public},
     rsa::{Padding, Rsa},
     sign::Signer,
 };
@@ -15,8 +15,16 @@ use crate::{
     KEY_WIDTH,
 };
 
-pub fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
+pub fn generate_rsa_key() -> Result<Rsa<Private>, Error> {
     Ok(Rsa::generate(KEY_WIDTH)?)
+}
+
+pub fn generate_rsa_keypair() -> Result<(Rsa<Private>, Rsa<Public>), Error> {
+    let rsa_key = generate_rsa_key()?;
+    Ok((
+        Rsa::private_key_from_pem(&rsa_key.private_key_to_pem()?)?,
+        Rsa::public_key_from_pem(&rsa_key.public_key_to_pem()?)?,
+    ))
 }
 
 pub fn jwk(private_key: &Rsa<Private>) -> Result<serde_json::Value, Error> {
@@ -123,9 +131,9 @@ pub fn save_certificates(certificate_chain: Certificate) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn save_keypair(keypair: Rsa<Private>) -> Result<(), Error> {
-    let private_key = keypair.private_key_to_pem()?;
-    let public_key = keypair.public_key_to_pem()?;
+pub fn save_keypair(keypair: &(Rsa<Private>, Rsa<Public>)) -> Result<(), Error> {
+    let private_key = keypair.0.private_key_to_pem()?;
+    let public_key = keypair.1.public_key_to_pem()?;
 
     std::fs::write("my_key", &private_key)?;
     std::fs::write("my_key.pub", &public_key)?;
@@ -133,8 +141,15 @@ pub fn save_keypair(keypair: Rsa<Private>) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn load_keys_from_file(path_to_private: String) -> Result<Rsa<Private>, Error> {
+pub fn load_keys_from_file(
+    path_to_private: &str,
+    path_to_public: &str,
+) -> Result<(Rsa<Private>, Rsa<Public>), Error> {
     let priv_key = std::fs::read(path_to_private)?;
+    let pub_key = std::fs::read(path_to_public)?;
 
-    Ok(Rsa::private_key_from_pem(&priv_key)?)
+    Ok((
+        Rsa::private_key_from_pem(&priv_key)?,
+        Rsa::public_key_from_pem(&pub_key)?,
+    ))
 }

@@ -1,7 +1,7 @@
 use openssl::{
     hash::MessageDigest,
     nid::Nid,
-    pkey::Private,
+    pkey::{Private, Public},
     rsa::Rsa,
     sha::Sha256,
     x509::{X509NameBuilder, X509Req, X509ReqBuilder},
@@ -12,9 +12,7 @@ use serde_json::json;
 
 use crate::{
     error::Error,
-    generate_rsa_keypair,
     util::{b64, extract_payload_and_nonce, extract_payload_location_and_nonce, jwk, jws},
-    SERVER,
 };
 
 pub type Nonce = String;
@@ -43,8 +41,8 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub fn fetch_dir(client: &Client) -> Result<Self, Error> {
-        let mut dir_infos: Self = client.get(SERVER).send()?.json()?;
+    pub fn fetch_dir(client: &Client, server_url: &str) -> Result<Self, Error> {
+        let mut dir_infos: Self = client.get(server_url).send()?.json()?;
 
         // fetch the new nonce
         let nonce = client
@@ -159,7 +157,11 @@ impl Order {
         account_url: &str,
         p_key: &Rsa<Private>,
     ) -> Result<ChallengeAuthorisation, Error> {
-        let auth_url = self.authorizations.first().ok_or(Error::NoHttpChallengePresent)?.to_string();
+        let auth_url = self
+            .authorizations
+            .first()
+            .ok_or(Error::NoHttpChallengePresent)?
+            .to_string();
 
         let header = json!({
             "alg": "RS256",
@@ -192,6 +194,7 @@ impl Order {
         account_url: &str,
         new_nonce: Nonce,
         p_key: &Rsa<Private>,
+        cert_keypair: &(Rsa<Private>, Rsa<Public>),
         domain: &str,
     ) -> Result<UpdatedOrder, Error> {
         let header = json!({
@@ -201,8 +204,7 @@ impl Order {
         "nonce": new_nonce,
         });
 
-        let csr_key = generate_rsa_keypair()?;
-        let csr = Order::request_csr(&csr_key, domain.to_owned())?;
+        let csr = Order::request_csr(cert_keypair, domain.to_owned())?;
         let csr_string = b64(&csr.to_der()?);
 
         println!("{}", csr_string);
@@ -226,17 +228,18 @@ impl Order {
         Ok(updated_order)
     }
 
-    fn request_csr(private_key: &Rsa<Private>, common_name: String) -> Result<X509Req, Error> {
+    fn request_csr(
+        keypair: &(Rsa<Private>, Rsa<Public>),
+        common_name: String,
+    ) -> Result<X509Req, Error> {
         let mut request = X509ReqBuilder::new()?;
         let mut c_name = X509NameBuilder::new()?;
 
-        let pri_key =
-            &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem()?)?;
+        let pri_key = &openssl::pkey::PKey::private_key_from_pem(&keypair.0.private_key_to_pem()?)?;
         let public_key =
-            &openssl::pkey::PKey::public_key_from_pem(&private_key.public_key_to_pem()?)?;
+            &openssl::pkey::PKey::public_key_from_pem(&keypair.1.public_key_to_pem()?)?;
 
-        c_name
-            .append_entry_by_nid(Nid::COMMONNAME, &common_name)?;
+        c_name.append_entry_by_nid(Nid::COMMONNAME, &common_name)?;
         let name = c_name.build();
         request.set_pubkey(public_key)?;
         request.set_subject_name(name.as_ref())?;
