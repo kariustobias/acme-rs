@@ -10,7 +10,7 @@ An `ACME` Client for Let's Encrypt written in Rust to request SSL/TLS certificat
 ## Features
 - `acme-rs` in its current state does only support the http challenge. The port 80 must not be blocked. <br>
 - You have the option to generate you keypair for the certificate first before executing the client. <br>
-- By default, acme-rs will send the request to the URL https://acme-v02.api.letsencrypt.org/directory. However, you can manually change the ACME Server URL by using the "--server" flag.
+- By default, acme-rs will send the request to the URL https://acme-v02.api.letsencrypt.org/directory. However, you can manually change the ACME Server URL by using the `--server` flag.
 
 ## Installation
 
@@ -28,7 +28,7 @@ The client will store the certificate and the certificate chain in the files "ce
 ### Request a certificate
 You can request a certificate by using the following command: <br>
 ```bash
-acme-rs [OPTIONS] --domain <domain>
+acme-rs [OPTIONS] --domain <domain> --email <email>
 ```
 
 
