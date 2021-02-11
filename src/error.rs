@@ -67,8 +67,6 @@ pub enum Error {
     FromUtf8Error(std::str::Utf8Error),
     /// Error converted from a reqwest error
     FromReqwestError(reqwest::Error),
-    /// Error converted from an Url parse error
-    FromUrlParseError(url::ParseError),
     /// Error converted from an ErrorStack Error (occurs during RSA generation)
     FromRsaError(ErrorStack),
     /// Error converted from a json serde error
@@ -90,12 +88,6 @@ impl From<std::str::Utf8Error> for Error {
 impl From<reqwest::Error> for Error {
     fn from(error: reqwest::Error) -> Self {
         Error::FromReqwestError(error)
-    }
-}
-
-impl From<url::ParseError> for Error {
-    fn from(error: url::ParseError) -> Self {
-        Error::FromUrlParseError(error)
     }
 }
 
