@@ -27,7 +27,7 @@ The client will store the certificate and the certificate chain in the files "ce
 
 ### Request a certificate
 You can request a certificate by using the following command: <br>
-```bash
+```
 acme-rs [OPTIONS] --domain <domain> --email <email>
 ```
 
@@ -35,7 +35,7 @@ acme-rs [OPTIONS] --domain <domain> --email <email>
 ## Options
 By running the command "acme-rs --help" you can get an overview of all the commands available.
 
-```bash
+```
 An acme client (RFC8555) written in the rust programming language
 
 USAGE:
