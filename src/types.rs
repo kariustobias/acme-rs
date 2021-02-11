@@ -1,9 +1,24 @@
-use openssl::{hash::MessageDigest, nid::Nid, pkey::Private, rsa::Rsa, sha::Sha256, x509::{X509NameBuilder, X509Req, X509ReqBuilder}};
+use openssl::{
+    hash::MessageDigest,
+    nid::Nid,
+    pkey::Private,
+    rsa::Rsa,
+    sha::Sha256,
+    x509::{X509NameBuilder, X509Req, X509ReqBuilder},
+};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{IDENTIFIER, Nonce, SERVER, error::Error, generate_rsa_keypair, util::{b64, extract_payload_and_nonce, extract_payload_location_and_nonce, jwk, jws}};
+use crate::{
+    error::Error,
+    generate_rsa_keypair,
+    util::{b64, extract_payload_and_nonce, extract_payload_location_and_nonce, jwk, jws},
+    IDENTIFIER, SERVER,
+};
+
+pub type Nonce = String;
+pub type Certificate = String;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum StatusType {
@@ -127,7 +142,6 @@ impl Account {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Order {
-    //Page 26
     pub status: String,
     pub expires: String,
     pub identifiers: serde_json::Value,
@@ -171,49 +185,56 @@ impl Order {
         Ok(challenge)
     }
 
-    pub fn finalize_order(&self, client: &Client, account_url: &str, new_nonce: Nonce, p_key: &Rsa<Private>) -> Result<UdatedOrder, Error> {
+    pub fn finalize_order(
+        &self,
+        client: &Client,
+        account_url: &str,
+        new_nonce: Nonce,
+        p_key: &Rsa<Private>,
+    ) -> Result<UpdatedOrder, Error> {
         let header = json!({
-            "alg": "RS256",
-            "url": self.finalize,
-            "kid": account_url,
-            "nonce": new_nonce,
-            });
-        
-            let csr_key = generate_rsa_keypair()?;
-            let csr = Order::request_csr(&csr_key, IDENTIFIER.to_owned());
-            let csr_string = b64(&csr.to_der().unwrap());
-        
-            println!("{}", csr_string);
-        
-            let payload = json!({ "csr": csr_string });
-        
-            let jws = jws(payload, header, p_key).unwrap();
-        
-            let response = dbg!(client
-                .post(&self.finalize)
-                .header("Content-Type", "application/jose+json")
-                .header("Accept", "application/pem-certificate-chain")
-                .body(serde_json::to_string_pretty(&jws)?)
-                .send())?;
+        "alg": "RS256",
+        "url": self.finalize,
+        "kid": account_url,
+        "nonce": new_nonce,
+        });
 
-            let (nonce, mut updated_order): (Nonce, UdatedOrder) = extract_payload_and_nonce(response)?;
-            
-            updated_order.nonce = nonce;
+        let csr_key = generate_rsa_keypair()?;
+        let csr = Order::request_csr(&csr_key, IDENTIFIER.to_owned());
+        let csr_string = b64(&csr.to_der().unwrap());
 
-            Ok(updated_order)
+        println!("{}", csr_string);
+
+        let payload = json!({ "csr": csr_string });
+
+        let jws = jws(payload, header, p_key).unwrap();
+
+        let response = dbg!(client
+            .post(&self.finalize)
+            .header("Content-Type", "application/jose+json")
+            .header("Accept", "application/pem-certificate-chain")
+            .body(serde_json::to_string_pretty(&jws)?)
+            .send())?;
+
+        let (nonce, mut updated_order): (Nonce, UpdatedOrder) =
+            extract_payload_and_nonce(response)?;
+
+        updated_order.nonce = nonce;
+
+        Ok(updated_order)
     }
 
     fn request_csr(private_key: &Rsa<Private>, common_name: String) -> X509Req {
         let mut request = X509ReqBuilder::new().unwrap();
         let mut c_name = X509NameBuilder::new().unwrap();
-    
+
         let pri_key =
             &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem().unwrap())
                 .unwrap();
         let public_key =
             &openssl::pkey::PKey::public_key_from_pem(&private_key.public_key_to_pem().unwrap())
                 .unwrap();
-    
+
         c_name
             .append_entry_by_nid(Nid::COMMONNAME, &common_name)
             .unwrap();
@@ -221,7 +242,7 @@ impl Order {
         request.set_pubkey(public_key).unwrap();
         request.set_subject_name(name.as_ref()).unwrap();
         request.sign(pri_key, MessageDigest::sha256()).unwrap();
-    
+
         request.build()
     }
 }
@@ -340,7 +361,7 @@ impl ChallengeAuthorisation {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct UdatedOrder {
+pub struct UpdatedOrder {
     pub status: String,
     expires: String,
     identifiers: serde_json::Value,
@@ -351,17 +372,28 @@ pub struct UdatedOrder {
     pub nonce: Nonce,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct GetCertificate {
-    payload: Option<String>,
-    protected: serde_json::Value,
-    signature: serde_json::Value,
-}
+impl UpdatedOrder {
+    pub fn download_certificate(
+        &self,
+        client: &Client,
+        account_url: &str,
+        p_key: &Rsa<Private>,
+    ) -> Result<Certificate, Error> {
+        let header = json!({
+            "alg": "RS256",
+            "url": self.certificate,
+            "kid": account_url,
+            "nonce": self.nonce,
+        });
+        let payload = json!("");
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Certificate {}
+        let jws = dbg!(jws(payload, header, p_key)?);
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Conformation {
-    certificate: Certificate,
+        Ok(dbg!(client
+            .post(&self.certificate)
+            .header("Content-Type", "application/jose+json")
+            .body(serde_json::to_string_pretty(&jws)?)
+            .send())?
+        .text()?)
+    }
 }

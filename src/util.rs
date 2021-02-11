@@ -9,7 +9,11 @@ use reqwest::blocking::Response;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
-use crate::{error::Error, Nonce};
+use crate::{KEY_WIDTH, error::Error, types::{Certificate, Nonce}};
+
+pub fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
+    Ok(Rsa::generate(KEY_WIDTH)?)
+}
 
 pub fn jwk(private_key: &Rsa<Private>) -> Result<serde_json::Value, Error> {
     let e = b64(&private_key.e().to_vec());
@@ -96,7 +100,7 @@ where
     Ok((location, replay_nonce, response.json()?))
 }
 
-pub fn save_certificates(certificate_chain: String) -> Result<(), Error> {
+pub fn save_certificates(certificate_chain: Certificate) -> Result<(), Error> {
     // extract the first certificat (certificate for the specified domain)
     let cert_me = certificate_chain
         .lines()
@@ -111,6 +115,16 @@ pub fn save_certificates(certificate_chain: String) -> Result<(), Error> {
     // save the certs to files
     std::fs::write("my_cert.crt", cert_me.into_bytes()).unwrap();
     std::fs::write("cert_chain.crt", certificate_chain.into_bytes()).unwrap();
+
+    Ok(())
+}
+
+pub fn save_keypair(keypair: Rsa<Private>) -> Result<(), Error> {
+    let private_key = keypair.private_key_to_pem()?;
+    let public_key = keypair.public_key_to_pem()?;
+
+    std::fs::write("my_key", &private_key)?;
+    std::fs::write("my_key.pub", &public_key)?;
 
     Ok(())
 }

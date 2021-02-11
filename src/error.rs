@@ -1,3 +1,5 @@
+use std::io;
+
 use openssl::error::ErrorStack;
 use reqwest::header::ToStrError;
 #[allow(dead_code)]
@@ -73,6 +75,7 @@ pub enum Error {
     FromSerdeError(serde_json::Error),
     /// Error converted from a reqwest ToStrError
     FromToStrError(ToStrError),
+    FromIoError(io::Error),
     // Currently just http challenges are allowed, so this error is raised if
     // no http challenge is present
     NoHttpChallengePresent,
@@ -111,5 +114,11 @@ impl From<serde_json::Error> for Error {
 impl From<ToStrError> for Error {
     fn from(error: ToStrError) -> Self {
         Error::FromToStrError(error)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(error: io::Error) -> Self {
+        Error::FromIoError(error)
     }
 }
