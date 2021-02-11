@@ -1,4 +1,5 @@
 use openssl::error::ErrorStack;
+use reqwest::header::ToStrError;
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum Error {
@@ -70,6 +71,11 @@ pub enum Error {
     FromRsaError(ErrorStack),
     /// Error converted from a json serde error
     FromSerdeError(serde_json::Error),
+    /// Error converted from a reqwest ToStrError
+    FromToStrError(ToStrError),
+    // Currently just http challenges are allowed, so this error is raised if
+    // no http challenge is present
+    NoHttpChallengePresent,
 }
 
 impl From<std::str::Utf8Error> for Error {
@@ -99,5 +105,11 @@ impl From<ErrorStack> for Error {
 impl From<serde_json::Error> for Error {
     fn from(error: serde_json::Error) -> Self {
         Error::FromSerdeError(error)
+    }
+}
+
+impl From<ToStrError> for Error {
+    fn from(error: ToStrError) -> Self {
+        Error::FromToStrError(error)
     }
 }

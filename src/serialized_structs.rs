@@ -1,4 +1,9 @@
+use openssl::{hash::MessageDigest, nid::Nid, pkey::Private, rsa::Rsa, sha::Sha256, x509::{X509NameBuilder, X509Req, X509ReqBuilder}};
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+use crate::{IDENTIFIER, Nonce, SERVER, error::Error, generate_rsa_keypair, util::{b64, extract_payload_and_nonce, extract_payload_location_and_nonce, jwk, jws}};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum StatusType {
@@ -11,83 +16,214 @@ pub enum StatusType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Directory {
-
-    #[serde(rename = "newNonce")]
     pub new_nonce: String,
-    #[serde(rename = "newAccount")]
     pub new_account: String,
-    #[serde(rename="newOrder")]
     pub new_order: String,
-    #[serde(rename="revokeCert")]
     pub revoke_cert: String,
-    #[serde(rename="keyChange")]
     pub key_change: String,
-   // pub meta: Vec<serde_json::Value>,
-    //optional termsOfService : URL
-    //optional website : URL
-    //optional caaIdentities : [URL]
-    //optional externalAccountRequired: false
+    #[serde(skip)]
+    nonce: Nonce,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AccountManagment{
-    //Page 34
-    contact: Option<Vec<String>>,
-    terms_of_service_agreed: Option<bool>,
-    only_return_existing: Option<bool>,
-    external_account_binding: Option<serde_json::Value>,
-    payload: (bool, serde_json::Value),
-    protected: serde_json::Value,
-    signature: String,
+impl Directory {
+    pub fn fetch_dir(client: &Client) -> Result<Self, Error> {
+        let mut dir_infos: Self = client.get(SERVER).send()?.json()?;
+
+        // fetch the new nonce
+        let nonce = client
+            .head(&dir_infos.new_nonce)
+            .send()?
+            .headers()
+            .get("replay-nonce")
+            .ok_or(Error::BadNonce)?
+            .to_str()?
+            .to_owned();
+
+        dir_infos.nonce = nonce;
+
+        Ok(dir_infos)
+    }
+
+    pub fn create_account(&self, client: &Client, p_key: &Rsa<Private>) -> Result<Account, Error> {
+        let jwk = jwk(&p_key)?;
+        let header = json!({
+            "alg": "RS256",
+            "url": self.new_account,
+            "jwk": jwk,
+            "nonce": self.nonce,
+        });
+
+        let payload = json!({
+            "termsOfServiceAgreed": true,
+            "contact": ["mailto:bastian@cmbt.de"]
+        });
+
+        let payload = jws(payload, header, p_key)?;
+
+        let response = dbg!(client
+            .post(&self.new_account)
+            .header("Content-Type", "application/jose+json")
+            .body(serde_json::to_string_pretty(&payload)?)
+            .send())?;
+
+        let (location, nonce, mut account): (String, Nonce, Account) =
+            extract_payload_location_and_nonce(response)?;
+
+        account.nonce = nonce;
+        account.account_location = location;
+
+        Ok(account)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Account {
-    //Page 24
-    status: String,
+    pub status: String,
     contact: Option<Vec<String>>,
     terms_of_service_agreed: Option<bool>,
-    external_account_binding: serde_json::Value, // Including this field in a
-    //newAccount request indicates approval by the holder of an existing
-    //non-ACME account to bind that account to this ACME account.  This
-    //field is not updateable by the client (see Section 7.3.4).
-    orders: Vec<String>,
+    pub orders: Option<Vec<String>>,
+    #[serde(skip)]
+    pub nonce: Nonce,
+    #[serde(skip)]
+    pub account_location: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NewOrder {
-    //Page 44
-    identifiers: serde_json::Value,
-    not_after: Option<String>,
-    not_before: Option<String>,
-    payload: serde_json::Value,
-    protected: serde_json::Value,
-    signature: serde_json::Value,
+impl Account {
+    pub fn create_new_order(
+        &self,
+        client: &Client,
+        new_order_url: &str,
+        p_key: &Rsa<Private>,
+    ) -> Result<Order, Error> {
+        let header = json!({
+            "alg": "RS256",
+            "url": new_order_url,
+            "kid": self.account_location,
+            "nonce": self.nonce,
+        });
+
+        let payload = json!({
+            "identifiers": [
+                { "type": "dns", "value": IDENTIFIER }
+            ],
+        });
+
+        let payload = jws(payload, header, p_key)?;
+
+        let response = dbg!(client
+            .post(new_order_url)
+            .header("Content-Type", "application/jose+json")
+            .body(serde_json::to_string_pretty(&payload)?)
+            .send())?;
+
+        let (nonce, mut order): (Nonce, Order) = extract_payload_and_nonce(response)?;
+        order.nonce = nonce;
+
+        Ok(order)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Order {
     //Page 26
-    status: String,
-    expires: String,
-    identifiers: serde_json::Value,
-    not_before: Option<String>,
-    not_after: Option<String>,
-    error: Option<serde_json::Value>,
-    authorisations: Vec<String>,
-    finalize: String,
-    certificate: Option<String>,
-
+    pub status: String,
+    pub expires: String,
+    pub identifiers: serde_json::Value,
+    pub authorizations: Vec<String>,
+    pub finalize: String,
+    #[serde(skip)]
+    pub nonce: Nonce,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SendAuthorisation {
-    //Page 49
-    identifiers: serde_json::Value,
-    payload: Option<String>,
-    protected: serde_json::Value,
-    signature: String,
+impl Order {
+    pub fn fetch_auth_challenges(
+        &self,
+        client: &Client,
+        account_url: &str,
+        p_key: &Rsa<Private>,
+    ) -> Result<ChallengeAuthorisation, Error> {
+        let auth_url = self.authorizations.first().unwrap().to_string();
+
+        let header = json!({
+            "alg": "RS256",
+            "url": auth_url,
+            "kid": account_url,
+            "nonce": self.nonce,
+        });
+
+        let payload = json!("");
+
+        let jws = dbg!(jws(payload, header, p_key)?);
+
+        let response = dbg!(client
+            .post(&auth_url)
+            .header("Content-Type", "application/jose+json")
+            .body(serde_json::to_string_pretty(&jws)?)
+            .send())?;
+
+        let (nonce, mut challenge): (Nonce, ChallengeAuthorisation) =
+            extract_payload_and_nonce(response)?;
+
+        challenge.nonce = nonce;
+
+        Ok(challenge)
+    }
+
+    pub fn finalize_order(&self, client: &Client, account_url: &str, new_nonce: Nonce, p_key: &Rsa<Private>) -> Result<UdatedOrder, Error> {
+        let header = json!({
+            "alg": "RS256",
+            "url": self.finalize,
+            "kid": account_url,
+            "nonce": new_nonce,
+            });
+        
+            let csr_key = generate_rsa_keypair()?;
+            let csr = Order::request_csr(&csr_key, IDENTIFIER.to_owned());
+            let csr_string = b64(&csr.to_der().unwrap());
+        
+            println!("{}", csr_string);
+        
+            let payload = json!({ "csr": csr_string });
+        
+            let jws = jws(payload, header, p_key).unwrap();
+        
+            let response = dbg!(client
+                .post(&self.finalize)
+                .header("Content-Type", "application/jose+json")
+                .header("Accept", "application/pem-certificate-chain")
+                .body(serde_json::to_string_pretty(&jws)?)
+                .send())?;
+
+            let (nonce, mut updated_order): (Nonce, UdatedOrder) = extract_payload_and_nonce(response)?;
+            
+            updated_order.nonce = nonce;
+
+            Ok(updated_order)
+    }
+
+    fn request_csr(private_key: &Rsa<Private>, common_name: String) -> X509Req {
+        let mut request = X509ReqBuilder::new().unwrap();
+        let mut c_name = X509NameBuilder::new().unwrap();
+    
+        let pri_key =
+            &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem().unwrap())
+                .unwrap();
+        let public_key =
+            &openssl::pkey::PKey::public_key_from_pem(&private_key.public_key_to_pem().unwrap())
+                .unwrap();
+    
+        c_name
+            .append_entry_by_nid(Nid::COMMONNAME, &common_name)
+            .unwrap();
+        let name = c_name.build();
+        request.set_pubkey(public_key).unwrap();
+        request.set_subject_name(name.as_ref()).unwrap();
+        request.sign(pri_key, MessageDigest::sha256()).unwrap();
+    
+        request.build()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,26 +243,112 @@ pub struct ChallengeAuthorisation {
     pub expires: String,
     pub challenges: Vec<Challenge>,
     pub wildcard: Option<bool>,
+    #[serde(skip)]
+    pub nonce: Nonce,
+}
+
+impl ChallengeAuthorisation {
+    pub fn complete_http_challenge(
+        self,
+        client: &Client,
+        account_url: &str,
+        p_key: &Rsa<Private>,
+    ) -> Result<Nonce, Error> {
+        let http_challenge = self
+            .challenges
+            .into_iter()
+            .find(|challenge| challenge.challenge_type == "http-01")
+            .ok_or(Error::NoHttpChallengePresent)?;
+
+        Ok(ChallengeAuthorisation::complete_challenge(
+            client,
+            http_challenge,
+            self.nonce,
+            account_url,
+            p_key,
+        )?)
+    }
+
+    fn complete_challenge(
+        client: &Client,
+        challenge_infos: Challenge,
+        nonce: Nonce,
+        acc_url: &str,
+        private_key: &Rsa<Private>,
+    ) -> Result<Nonce, Error> {
+        let thumbprint = jwk(&private_key)?;
+        let mut hasher = Sha256::new();
+        hasher.update(&thumbprint.to_string().into_bytes());
+        let thumbprint = hasher.finish();
+
+        let challenge_content = format!("{}.{}", challenge_infos.token, b64(&thumbprint));
+
+        let result = ChallengeAuthorisation::kick_off_http_challenge(
+            client,
+            challenge_infos.clone(),
+            nonce,
+            acc_url,
+            private_key,
+        )?;
+
+        std::thread::spawn(|| {
+            rouille::start_server("0.0.0.0:80", move |request| {
+                if request.raw_url()
+                    == format!("/.well-known/acme-challenge/{}", challenge_infos.token)
+                {
+                    println!("Got Request!");
+                    rouille::Response::text(challenge_content.clone())
+                } else {
+                    rouille::Response::empty_404()
+                }
+            });
+        });
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        Ok(result)
+    }
+
+    fn kick_off_http_challenge(
+        client: &Client,
+        challenge_infos: Challenge,
+        nonce: Nonce,
+        acc_url: &str,
+        private_key: &Rsa<Private>,
+    ) -> Result<Nonce, Error> {
+        let header = json!({
+            "alg": "RS256",
+            "kid": acc_url,
+            "nonce": nonce,
+            "url": challenge_infos.url
+        });
+
+        let payload = json!({});
+
+        let jws = jws(payload, header, private_key)?;
+
+        Ok(dbg!(client
+            .post(&challenge_infos.url)
+            .header("Content-Type", "application/jose+json")
+            .body(serde_json::to_string_pretty(&jws)?)
+            .send())?
+        .headers()
+        .get("replay-nonce")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RespondingToChallange {
-    //Page 54
-    payload: serde_json::Value,
-    protected: serde_json::Value,
-    signature: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct UdatedOrderObject {
-    status: String,
+pub struct UdatedOrder {
+    pub status: String,
     expires: String,
     identifiers: serde_json::Value,
-    not_before: String,
-    not_after: String,
-    authorisations: serde_json::Value,
+    authorizations: serde_json::Value,
     finalize: String,
-    certificate: String,
+    pub certificate: String,
+    #[serde(skip)]
+    pub nonce: Nonce,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -137,8 +359,7 @@ struct GetCertificate {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Certificate {
-}
+struct Certificate {}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Conformation {
