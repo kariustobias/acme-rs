@@ -14,7 +14,7 @@ const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 const KEY_WIDTH: u32 = 2048;
 
 #[derive(Clap)]
-#[clap(version = "0.1.0", author = "B. Kersting <bastian@cmbt.de>, T. Karius <t.karius@>, Elena Lilova <>, Dominik Jantschar")]
+#[clap(version = "0.1.0", author = "Bastian Kersting <bastian@cmbt.de>, Tobias Karius <tobias.karius@yahoo.de>, Elena Lilova <elena.lilova@gmx.de>, Dominik Jantschar <dominik.jantschar@web.de>")]
 struct Opts {
     /// The domain to register the certificate for
     #[clap(short, long)]
