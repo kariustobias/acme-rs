@@ -2,22 +2,40 @@ mod error;
 mod types;
 mod util;
 
+use clap::Clap;
 use error::Error;
 use openssl::{pkey::Private, rsa::Rsa};
 use reqwest::blocking::Client;
 
 use types::{Certificate, Directory};
-use util::{generate_rsa_keypair, save_certificates, save_keypair};
+use util::{generate_rsa_keypair, load_keys_from_file, save_certificates, save_keypair};
 
 const SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 const KEY_WIDTH: u32 = 2048;
 
+#[derive(Clap)]
+#[clap(version = "0.1.0", author = "B. Kersting <bastian@cmbt.de>, T. Karius <t.karius@>, Elena Lilova <>, Dominik Jantschar")]
+struct Opts {
+    /// The domain to register the certificate for
+    #[clap(short, long)]
+    domain: String,
+    /// An optional private key file (PEM format) to load the keys from
+    #[clap(short, long)]
+    private_key: Option<String>,
+}
+
 fn main() {
+    // parse the cmd arguments
+    let opts: Opts = Opts::parse();
+
     // create a new key pair
-    let p_key = generate_rsa_keypair().expect("Could not generate keypair");
+    let p_key = match opts.private_key {
+        Some(path) => load_keys_from_file(path),
+        None => generate_rsa_keypair(),
+    }.expect("Could not generate keypair");
 
     // get the certificate
-    let cert_chain = generate_cert_for_domain(&p_key, "mb.cmbt.de").expect("Error during creation");
+    let cert_chain = generate_cert_for_domain(&p_key, opts.domain).expect("Error during creation");
 
     // save the certificate and the keypair
     save_certificates(cert_chain).expect("Unable to save certificate");

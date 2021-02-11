@@ -202,7 +202,7 @@ impl Order {
         });
 
         let csr_key = generate_rsa_keypair()?;
-        let csr = Order::request_csr(&csr_key, domain.to_owned());
+        let csr = Order::request_csr(&csr_key, domain.to_owned())?;
         let csr_string = b64(&csr.to_der()?);
 
         println!("{}", csr_string);
@@ -352,7 +352,7 @@ impl ChallengeAuthorisation {
             .send())?
         .headers()
         .get("replay-nonce")
-        .ok_or(Error::IncorrectResponse)
+        .ok_or(Error::IncorrectResponse)?
         .to_str()?
         .to_owned())
     }

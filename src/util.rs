@@ -132,3 +132,9 @@ pub fn save_keypair(keypair: Rsa<Private>) -> Result<(), Error> {
 
     Ok(())
 }
+
+pub fn load_keys_from_file(path_to_private: String) -> Result<Rsa<Private>, Error> {
+    let priv_key = std::fs::read(path_to_private)?;
+
+    Ok(Rsa::private_key_from_pem(&priv_key)?)
+}
