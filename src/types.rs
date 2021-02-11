@@ -79,7 +79,7 @@ impl Directory {
 
         let payload = json!({
             "termsOfServiceAgreed": true,
-            "contact": [email]
+            "contact": [format!("mailto:{}", email)]
         });
 
         let payload = jws(payload, header, p_key)?;

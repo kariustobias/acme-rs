@@ -36,8 +36,10 @@ acme-rs [OPTIONS] --domain <domain>
 By running the command "acme-rs --help" you can get an overview of all the commands available.
 
 ```bash
+An acme client (RFC8555) written in the rust programming language
+
 USAGE:
-    acme-rs [FLAGS] [OPTIONS] --domain <domain>
+    acme-rs [FLAGS] [OPTIONS] --email <email> --domain <domain>
 
 FLAGS:
     -h, --help       Prints help information
@@ -46,6 +48,7 @@ FLAGS:
 
 OPTIONS:
     -d, --domain <domain>              The domain to register the certificate for
+    -e, --email <email>
         --private-key <private-key>    An optional private key file (PEM format) to load the keys
                                        from
         --public-key <public-key>
