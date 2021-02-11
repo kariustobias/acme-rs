@@ -9,6 +9,7 @@ mod util;
 
 use clap::Clap;
 use error::Error;
+use flexi_logger::Logger;
 use log::info;
 use openssl::{
     pkey::{Private, Public},
@@ -37,9 +38,10 @@ struct Opts {
     #[clap(short, long)]
     domain: String,
     /// An optional private key file (PEM format) to load the keys from
-    #[clap(short, long)]
+    #[clap(long)]
     private_key: Option<String>,
     // An optional public key file (PEM format) to load the keys from
+    #[clap(long)]
     public_key: Option<String>,
     /// The ACME server's URL
     #[clap(short, long)]
@@ -52,6 +54,14 @@ struct Opts {
 fn main() {
     // parse the cmd arguments
     let opts: Opts = Opts::parse();
+
+    if opts.verbose {
+        // setup the logger if necessary
+        Logger::with_str("info")
+            .log_target(flexi_logger::LogTarget::StdOut)
+            .start()
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    }
 
     // create a new key pair or otherwise read from a file
     let keypair_for_cert = match (opts.private_key.as_ref(), opts.public_key.as_ref()) {
@@ -104,7 +114,7 @@ fn generate_cert_for_domain<T: AsRef<str>>(
     let dir_infos = Directory::fetch_dir(&client, server.as_ref())?;
     let new_acc = dir_infos.create_account(&client, &keypair)?;
     if verbose {
-        info!("Created account: {:?}", new_acc);
+        info!("Created account: {:#?}", new_acc);
     }
 
     // create a new order
