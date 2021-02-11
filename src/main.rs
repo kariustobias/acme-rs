@@ -27,13 +27,16 @@ const LETS_ENCRYPT_SERVER: &str = "https://acme-v02.api.letsencrypt.org/director
 const LETS_ENCRYPT_STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 const KEY_WIDTH: u32 = 2048;
 
-/// Holds information about the command line arguments.
+/// An acme client (RFC8555) written in the rust programming language
 #[derive(Clap)]
 #[clap(
     version = "0.1.0",
     author = "Bastian Kersting <bastian@cmbt.de>, Tobias Karius <tobias.karius@yahoo.de>, Elena Lilova <elena.lilova@gmx.de>, Dominik Jantschar <dominik.jantschar@web.de>"
 )]
 struct Opts {
+    // The email associated with the domain
+    #[clap(short, long)]
+    email: String,
     /// The domain to register the certificate for
     #[clap(short, long)]
     domain: String,
@@ -79,11 +82,12 @@ fn main() {
 
     // get the certificate
     let cert_chain = match opts.server {
-        Some(url) => generate_cert_for_domain(&keypair_for_cert, opts.domain, url, opts.verbose),
+        Some(url) => generate_cert_for_domain(&keypair_for_cert, opts.domain, url, opts.email, opts.verbose),
         None => generate_cert_for_domain(
             &keypair_for_cert,
             opts.domain,
             LETS_ENCRYPT_SERVER.to_owned(),
+            opts.email, 
             opts.verbose,
         ),
     }
@@ -103,6 +107,7 @@ fn generate_cert_for_domain<T: AsRef<str>>(
     keypair_for_cert: &(Rsa<Private>, Rsa<Public>),
     domain: T,
     server: T,
+    email: T,
     verbose: bool,
 ) -> Result<Certificate, Error> {
     // this keypair is used for authentificating the requests, but does not matter afterwards
@@ -112,7 +117,7 @@ fn generate_cert_for_domain<T: AsRef<str>>(
 
     // fetch the directory infos an create a new account
     let dir_infos = Directory::fetch_dir(&client, server.as_ref())?;
-    let new_acc = dir_infos.create_account(&client, &keypair)?;
+    let new_acc = dir_infos.create_account(&client, &keypair, email.as_ref())?;
     if verbose {
         info!("Created account: {:#?}", new_acc);
     }

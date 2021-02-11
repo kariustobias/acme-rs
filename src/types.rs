@@ -68,7 +68,7 @@ impl Directory {
     }
 
     /// Creates a new account.
-    pub fn create_account(&self, client: &Client, p_key: &Rsa<Private>) -> Result<Account, Error> {
+    pub fn create_account(&self, client: &Client, p_key: &Rsa<Private>, email: &str) -> Result<Account, Error> {
         let jwk = jwk(&p_key)?;
         let header = json!({
             "alg": "RS256",
@@ -79,7 +79,7 @@ impl Directory {
 
         let payload = json!({
             "termsOfServiceAgreed": true,
-            "contact": ["mailto:bastian@cmbt.de"]
+            "contact": [email]
         });
 
         let payload = jws(payload, header, p_key)?;
