@@ -14,7 +14,7 @@ use crate::{
     error::Error,
     generate_rsa_keypair,
     util::{b64, extract_payload_and_nonce, extract_payload_location_and_nonce, jwk, jws},
-    IDENTIFIER, SERVER,
+    SERVER,
 };
 
 pub type Nonce = String;
@@ -111,6 +111,7 @@ impl Account {
         client: &Client,
         new_order_url: &str,
         p_key: &Rsa<Private>,
+        domain: &str,
     ) -> Result<Order, Error> {
         let header = json!({
             "alg": "RS256",
@@ -121,7 +122,7 @@ impl Account {
 
         let payload = json!({
             "identifiers": [
-                { "type": "dns", "value": IDENTIFIER }
+                { "type": "dns", "value": domain }
             ],
         });
 
@@ -191,6 +192,7 @@ impl Order {
         account_url: &str,
         new_nonce: Nonce,
         p_key: &Rsa<Private>,
+        domain: &str,
     ) -> Result<UpdatedOrder, Error> {
         let header = json!({
         "alg": "RS256",
@@ -200,7 +202,7 @@ impl Order {
         });
 
         let csr_key = generate_rsa_keypair()?;
-        let csr = Order::request_csr(&csr_key, IDENTIFIER.to_owned());
+        let csr = Order::request_csr(&csr_key, domain.to_owned());
         let csr_string = b64(&csr.to_der().unwrap());
 
         println!("{}", csr_string);

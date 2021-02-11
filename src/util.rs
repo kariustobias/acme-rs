@@ -9,7 +9,11 @@ use reqwest::blocking::Response;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
-use crate::{KEY_WIDTH, error::Error, types::{Certificate, Nonce}};
+use crate::{
+    error::Error,
+    types::{Certificate, Nonce},
+    KEY_WIDTH,
+};
 
 pub fn generate_rsa_keypair() -> Result<Rsa<Private>, Error> {
     Ok(Rsa::generate(KEY_WIDTH)?)
