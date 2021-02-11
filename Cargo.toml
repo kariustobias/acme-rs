@@ -1,10 +1,12 @@
 [package]
 name = "acme-rs"
 version = "0.1.0"
-authors = ["Bastian Kersting <bastian@cmbt.de>"]
+authors = ["Bastian Kersting <bastian@cmbt.de>", "Tobias Karius <tobias.karius@yahoo.de>", "Elena Lilova <elena.lilova@gmx.de>", "Dominik Jantschar <dominik.jantschar@web.de>"]
+license = "MIT"
+keywords = ["acme", "network", "client", "SSL", "certificate"]
+description = "An acme client (RFC8555) written in the rust programming language"
+readme = "README.md"
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -15,3 +17,5 @@ rpki = "0.10.0"
 base64 = "0.13.0"
 rouille = "3.0.0"
 clap = "3.0.0-beta.2"
+flexi_logger = "0.17.1"
+log = "0.4.14"
