@@ -159,7 +159,7 @@ impl Order {
         account_url: &str,
         p_key: &Rsa<Private>,
     ) -> Result<ChallengeAuthorisation, Error> {
-        let auth_url = self.authorizations.first().unwrap().to_string();
+        let auth_url = self.authorizations.first().ok_or(Error::NoHttpChallengePresent)?.to_string();
 
         let header = json!({
             "alg": "RS256",
@@ -203,13 +203,13 @@ impl Order {
 
         let csr_key = generate_rsa_keypair()?;
         let csr = Order::request_csr(&csr_key, domain.to_owned());
-        let csr_string = b64(&csr.to_der().unwrap());
+        let csr_string = b64(&csr.to_der()?);
 
         println!("{}", csr_string);
 
         let payload = json!({ "csr": csr_string });
 
-        let jws = jws(payload, header, p_key).unwrap();
+        let jws = jws(payload, header, p_key)?;
 
         let response = dbg!(client
             .post(&self.finalize)
@@ -226,26 +226,23 @@ impl Order {
         Ok(updated_order)
     }
 
-    fn request_csr(private_key: &Rsa<Private>, common_name: String) -> X509Req {
-        let mut request = X509ReqBuilder::new().unwrap();
-        let mut c_name = X509NameBuilder::new().unwrap();
+    fn request_csr(private_key: &Rsa<Private>, common_name: String) -> Result<X509Req, Error> {
+        let mut request = X509ReqBuilder::new()?;
+        let mut c_name = X509NameBuilder::new()?;
 
         let pri_key =
-            &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem().unwrap())
-                .unwrap();
+            &openssl::pkey::PKey::private_key_from_pem(&private_key.private_key_to_pem()?)?;
         let public_key =
-            &openssl::pkey::PKey::public_key_from_pem(&private_key.public_key_to_pem().unwrap())
-                .unwrap();
+            &openssl::pkey::PKey::public_key_from_pem(&private_key.public_key_to_pem()?)?;
 
         c_name
-            .append_entry_by_nid(Nid::COMMONNAME, &common_name)
-            .unwrap();
+            .append_entry_by_nid(Nid::COMMONNAME, &common_name)?;
         let name = c_name.build();
-        request.set_pubkey(public_key).unwrap();
-        request.set_subject_name(name.as_ref()).unwrap();
-        request.sign(pri_key, MessageDigest::sha256()).unwrap();
+        request.set_pubkey(public_key)?;
+        request.set_subject_name(name.as_ref())?;
+        request.sign(pri_key, MessageDigest::sha256())?;
 
-        request.build()
+        Ok(request.build())
     }
 }
 
@@ -355,9 +352,8 @@ impl ChallengeAuthorisation {
             .send())?
         .headers()
         .get("replay-nonce")
-        .unwrap()
-        .to_str()
-        .unwrap()
+        .ok_or(Error::IncorrectResponse)
+        .to_str()?
         .to_owned())
     }
 }

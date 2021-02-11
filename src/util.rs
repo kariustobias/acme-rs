@@ -117,8 +117,8 @@ pub fn save_certificates(certificate_chain: Certificate) -> Result<(), Error> {
         .collect::<String>();
 
     // save the certs to files
-    std::fs::write("my_cert.crt", cert_me.into_bytes()).unwrap();
-    std::fs::write("cert_chain.crt", certificate_chain.into_bytes()).unwrap();
+    std::fs::write("my_cert.crt", cert_me.into_bytes())?;
+    std::fs::write("cert_chain.crt", certificate_chain.into_bytes())?;
 
     Ok(())
 }
