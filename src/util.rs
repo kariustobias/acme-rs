@@ -15,7 +15,7 @@ use crate::{
     KEY_WIDTH,
 };
 
-/// Generates a `RSA` private key. 
+/// Generates a `RSA` private key.
 pub fn generate_rsa_key() -> Result<Rsa<Private>, Error> {
     Ok(Rsa::generate(KEY_WIDTH)?)
 }

@@ -1,7 +1,7 @@
 /// The module which encapsulates the error enumeration
 /// and related code and types.
 mod error;
-/// All types concerning the ACME context. All of the types are 
+/// All types concerning the ACME context. All of the types are
 /// serializable for easy communication.
 mod types;
 /// A module which contains utility methods.
@@ -9,6 +9,7 @@ mod util;
 
 use clap::Clap;
 use error::Error;
+use log::info;
 use openssl::{
     pkey::{Private, Public},
     rsa::Rsa,
@@ -43,13 +44,16 @@ struct Opts {
     /// The ACME server's URL
     #[clap(short, long)]
     server: Option<String>,
+    /// Enables debug output.
+    #[clap(short, long)]
+    verbose: bool,
 }
 
 fn main() {
     // parse the cmd arguments
     let opts: Opts = Opts::parse();
 
-    // create a new key pair
+    // create a new key pair or otherwise read from a file
     let keypair_for_cert = match (opts.private_key.as_ref(), opts.public_key.as_ref()) {
         (Some(priv_path), Some(pub_path)) => load_keys_from_file(priv_path, pub_path),
 
@@ -65,8 +69,13 @@ fn main() {
 
     // get the certificate
     let cert_chain = match opts.server {
-        Some(url) => generate_cert_for_domain(&keypair_for_cert, opts.domain, url),
-        None => generate_cert_for_domain(&keypair_for_cert, opts.domain, LETS_ENCRYPT_SERVER.to_owned()),
+        Some(url) => generate_cert_for_domain(&keypair_for_cert, opts.domain, url, opts.verbose),
+        None => generate_cert_for_domain(
+            &keypair_for_cert,
+            opts.domain,
+            LETS_ENCRYPT_SERVER.to_owned(),
+            opts.verbose,
+        ),
     }
     .expect("Error during creation");
 
@@ -84,6 +93,7 @@ fn generate_cert_for_domain<T: AsRef<str>>(
     keypair_for_cert: &(Rsa<Private>, Rsa<Public>),
     domain: T,
     server: T,
+    verbose: bool,
 ) -> Result<Certificate, Error> {
     // this keypair is used for authentificating the requests, but does not matter afterwards
     let keypair = generate_rsa_key()?;
@@ -93,19 +103,36 @@ fn generate_cert_for_domain<T: AsRef<str>>(
     // fetch the directory infos an create a new account
     let dir_infos = Directory::fetch_dir(&client, server.as_ref())?;
     let new_acc = dir_infos.create_account(&client, &keypair)?;
-    println!("{:?}", new_acc);
+    if verbose {
+        info!("Created account: {:?}", new_acc);
+    }
 
     // create a new order
     let order =
         new_acc.create_new_order(&client, &dir_infos.new_order, &keypair, domain.as_ref())?;
-    println!("{:#?}", &order);
+    if verbose {
+        info!(
+            "Opened new order for domain {}: {:#?}",
+            domain.as_ref(),
+            &order
+        );
+    }
 
     // fetch the auth challenges
     let challenge = order.fetch_auth_challenges(&client, &new_acc.account_location, &keypair)?;
+    if verbose {
+        info!(
+            "Got the following authorization challenges: {:#?}",
+            &challenge
+        );
+    }
 
     // complete the challenge and save the nonce that's needed for further authentification
     let new_nonce =
         challenge.complete_http_challenge(&client, &new_acc.account_location, &keypair)?;
+    if verbose {
+        info!("Succesfully completed the http challenge");
+    }
 
     // finalize the order to retrieve location of the final cert
     let updated_order = order.finalize_order(
@@ -120,7 +147,9 @@ fn generate_cert_for_domain<T: AsRef<str>>(
     // download the certificate
     let cert_chain =
         updated_order.download_certificate(&client, &new_acc.account_location, &keypair)?;
-    println!("{}", &cert_chain);
+    if verbose {
+        info!("Received the following certificate chain: {}", cert_chain);
+    }
 
     Ok(cert_chain)
 }

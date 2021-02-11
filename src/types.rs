@@ -84,11 +84,11 @@ impl Directory {
 
         let payload = jws(payload, header, p_key)?;
 
-        let response = dbg!(client
+        let response = client
             .post(&self.new_account)
             .header("Content-Type", "application/jose+json")
             .body(serde_json::to_string_pretty(&payload)?)
-            .send())?;
+            .send()?;
 
         let (location, nonce, mut account): (String, Nonce, Account) =
             extract_payload_location_and_nonce(response)?;
@@ -137,11 +137,11 @@ impl Account {
 
         let payload = jws(payload, header, p_key)?;
 
-        let response = dbg!(client
+        let response = client
             .post(new_order_url)
             .header("Content-Type", "application/jose+json")
             .body(serde_json::to_string_pretty(&payload)?)
-            .send())?;
+            .send()?;
 
         let (nonce, mut order): (Nonce, Order) = extract_payload_and_nonce(response)?;
         order.nonce = nonce;
@@ -185,13 +185,13 @@ impl Order {
 
         let payload = json!("");
 
-        let jws = dbg!(jws(payload, header, p_key)?);
+        let jws = jws(payload, header, p_key)?;
 
-        let response = dbg!(client
+        let response = client
             .post(&auth_url)
             .header("Content-Type", "application/jose+json")
             .body(serde_json::to_string_pretty(&jws)?)
-            .send())?;
+            .send()?;
 
         let (nonce, mut challenge): (Nonce, ChallengeAuthorisation) =
             extract_payload_and_nonce(response)?;
@@ -222,18 +222,16 @@ impl Order {
         let csr = Order::request_csr(cert_keypair, domain.to_owned())?;
         let csr_string = b64(&csr.to_der()?);
 
-        println!("{}", csr_string);
-
         let payload = json!({ "csr": csr_string });
 
         let jws = jws(payload, header, p_key)?;
 
-        let response = dbg!(client
+        let response = client
             .post(&self.finalize)
             .header("Content-Type", "application/jose+json")
             .header("Accept", "application/pem-certificate-chain")
             .body(serde_json::to_string_pretty(&jws)?)
-            .send())?;
+            .send()?;
 
         let (nonce, mut updated_order): (Nonce, UpdatedOrder) =
             extract_payload_and_nonce(response)?;
@@ -340,7 +338,6 @@ impl ChallengeAuthorisation {
                 if request.raw_url()
                     == format!("/.well-known/acme-challenge/{}", challenge_infos.token)
                 {
-                    println!("Got Request!");
                     rouille::Response::text(challenge_content.clone())
                 } else {
                     rouille::Response::empty_404()
@@ -370,16 +367,16 @@ impl ChallengeAuthorisation {
 
         let jws = jws(payload, header, private_key)?;
 
-        Ok(dbg!(client
+        Ok(client
             .post(&challenge_infos.url)
             .header("Content-Type", "application/jose+json")
             .body(serde_json::to_string_pretty(&jws)?)
-            .send())?
-        .headers()
-        .get("replay-nonce")
-        .ok_or(Error::IncorrectResponse)?
-        .to_str()?
-        .to_owned())
+            .send()?
+            .headers()
+            .get("replay-nonce")
+            .ok_or(Error::IncorrectResponse)?
+            .to_str()?
+            .to_owned())
     }
 }
 
@@ -412,13 +409,13 @@ impl UpdatedOrder {
         });
         let payload = json!("");
 
-        let jws = dbg!(jws(payload, header, p_key)?);
+        let jws = jws(payload, header, p_key)?;
 
-        Ok(dbg!(client
+        Ok(client
             .post(&self.certificate)
             .header("Content-Type", "application/jose+json")
             .body(serde_json::to_string_pretty(&jws)?)
-            .send())?
-        .text()?)
+            .send()?
+            .text()?)
     }
 }
