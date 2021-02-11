@@ -15,10 +15,12 @@ use crate::{
     KEY_WIDTH,
 };
 
+/// Generates a `RSA` private key. 
 pub fn generate_rsa_key() -> Result<Rsa<Private>, Error> {
     Ok(Rsa::generate(KEY_WIDTH)?)
 }
 
+/// Generates a `RSA` keypair.
 pub fn generate_rsa_keypair() -> Result<(Rsa<Private>, Rsa<Public>), Error> {
     let rsa_key = generate_rsa_key()?;
     Ok((
@@ -27,6 +29,7 @@ pub fn generate_rsa_keypair() -> Result<(Rsa<Private>, Rsa<Public>), Error> {
     ))
 }
 
+/// Builds a json web key `JWK` (RFC7517).
 pub fn jwk(private_key: &Rsa<Private>) -> Result<serde_json::Value, Error> {
     let e = b64(&private_key.e().to_vec());
     let n = b64(&private_key.n().to_vec());
@@ -38,6 +41,7 @@ pub fn jwk(private_key: &Rsa<Private>) -> Result<serde_json::Value, Error> {
     }))
 }
 
+/// Constructs a json web signature `JWS` (RFC7515) in the flattened `JSON` form.
 pub fn jws(
     payload: serde_json::Value,
     header: serde_json::Value,
@@ -69,10 +73,12 @@ pub fn jws(
     }))
 }
 
+/// Returns the `base64url` encoding of the input.
 pub fn b64(to_encode: &[u8]) -> String {
     encode_config(to_encode, base64::URL_SAFE_NO_PAD)
 }
 
+/// Extracts the payload and `replay-nonce` header field from a given http `Response`.
 #[inline]
 pub fn extract_payload_and_nonce<T>(response: Response) -> Result<(Nonce, T), Error>
 where
@@ -88,6 +94,8 @@ where
     Ok((replay_nonce, response.json()?))
 }
 
+/// Extracts the `location` and `replay-nonce` header field as well as
+/// the payload from a given http `Response`.
 #[inline]
 pub fn extract_payload_location_and_nonce<T>(
     response: Response,
@@ -112,6 +120,9 @@ where
     Ok((location, replay_nonce, response.json()?))
 }
 
+/// Parses the certificate and writes them into to files:
+/// * my_cert.crt -> the certificate issued for the request,
+/// * cert_chain.crt -> the certificate chain issued for the request.
 pub fn save_certificates(certificate_chain: Certificate) -> Result<(), Error> {
     // extract the first certificat (certificate for the specified domain)
     let cert_me = certificate_chain
@@ -131,16 +142,19 @@ pub fn save_certificates(certificate_chain: Certificate) -> Result<(), Error> {
     Ok(())
 }
 
+/// Saves an rsa keypair into two files `priv.pem` and `pub.pem`
 pub fn save_keypair(keypair: &(Rsa<Private>, Rsa<Public>)) -> Result<(), Error> {
     let private_key = keypair.0.private_key_to_pem()?;
     let public_key = keypair.1.public_key_to_pem()?;
 
-    std::fs::write("my_key", &private_key)?;
-    std::fs::write("my_key.pub", &public_key)?;
+    std::fs::write("priv.pem", &private_key)?;
+    std::fs::write("pub.pem", &public_key)?;
 
     Ok(())
 }
 
+/// Loads a private key and a public key from the given files.
+/// The keys need to be safed in the `pem` format.
 pub fn load_keys_from_file(
     path_to_private: &str,
     path_to_public: &str,

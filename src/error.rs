@@ -2,6 +2,8 @@ use std::io;
 
 use openssl::error::ErrorStack;
 use reqwest::header::ToStrError;
+
+/// An enumeration of all possible error types.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum Error {

@@ -1,5 +1,10 @@
+/// The module which encapsulates the error enumeration
+/// and related code and types.
 mod error;
+/// All types concerning the ACME context. All of the types are 
+/// serializable for easy communication.
 mod types;
+/// A module which contains utility methods.
 mod util;
 
 use clap::Clap;
@@ -15,9 +20,12 @@ use util::{
     generate_rsa_key, generate_rsa_keypair, load_keys_from_file, save_certificates, save_keypair,
 };
 
-const STAGING_SERVER: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
+const LETS_ENCRYPT_SERVER: &str = "https://acme-v02.api.letsencrypt.org/directory";
+#[allow(dead_code)]
+const LETS_ENCRYPT_STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 const KEY_WIDTH: u32 = 2048;
 
+/// Holds information about the command line arguments.
 #[derive(Clap)]
 #[clap(
     version = "0.1.0",
@@ -58,7 +66,7 @@ fn main() {
     // get the certificate
     let cert_chain = match opts.server {
         Some(url) => generate_cert_for_domain(&keypair_for_cert, opts.domain, url),
-        None => generate_cert_for_domain(&keypair_for_cert, opts.domain, STAGING_SERVER.to_owned()),
+        None => generate_cert_for_domain(&keypair_for_cert, opts.domain, LETS_ENCRYPT_SERVER.to_owned()),
     }
     .expect("Error during creation");
 
@@ -69,6 +77,9 @@ fn main() {
     }
 }
 
+/// Generates a certificate for a certain domain. This method contains the logic for communicating with
+/// the server in order to authenticate for the certificate. The keypair that's passed to this method is
+/// used to sign the certificate signing request (CSR).
 fn generate_cert_for_domain<T: AsRef<str>>(
     keypair_for_cert: &(Rsa<Private>, Rsa<Public>),
     domain: T,

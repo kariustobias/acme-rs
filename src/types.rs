@@ -18,6 +18,9 @@ use crate::{
 pub type Nonce = String;
 pub type Certificate = String;
 
+/// The current status of the request. The status gets send from
+/// the server in every response and shows the progress as well as
+/// possible errors.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum StatusType {
     #[serde(rename = "valid")]
@@ -28,6 +31,9 @@ pub enum StatusType {
     Invalid,
 }
 
+/// The directory information that get returned in the first request
+/// to the server. Contains information about the urls of the common
+/// http endpoints.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Directory {
@@ -41,6 +47,8 @@ pub struct Directory {
 }
 
 impl Directory {
+    /// Fetches the directory information from a specific server. This is the first request
+    /// that's send to the server as it's return value holds information about the endpoints.
     pub fn fetch_dir(client: &Client, server_url: &str) -> Result<Self, Error> {
         let mut dir_infos: Self = client.get(server_url).send()?.json()?;
 
@@ -59,6 +67,7 @@ impl Directory {
         Ok(dir_infos)
     }
 
+    /// Creates a new account.
     pub fn create_account(&self, client: &Client, p_key: &Rsa<Private>) -> Result<Account, Error> {
         let jwk = jwk(&p_key)?;
         let header = json!({
@@ -91,6 +100,7 @@ impl Directory {
     }
 }
 
+/// A struct that holds information about an `Account` in the `ACME` context.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Account {
     pub status: String,
@@ -104,6 +114,7 @@ pub struct Account {
 }
 
 impl Account {
+    /// Creates a new order for issuing a dns certificate for a certain domain.
     pub fn create_new_order(
         &self,
         client: &Client,
@@ -139,6 +150,7 @@ impl Account {
     }
 }
 
+/// Holds information about an `Order` in the `ACME` context.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Order {
     pub status: String,
@@ -151,6 +163,7 @@ pub struct Order {
 }
 
 impl Order {
+    /// Fetches the available authorisation options from the server for a certain order.
     pub fn fetch_auth_challenges(
         &self,
         client: &Client,
@@ -188,6 +201,8 @@ impl Order {
         Ok(challenge)
     }
 
+    /// Finalizes an order whose challenge was already done. This returns an `UpdatedOrder` object which
+    /// is able to download the issued certificate. This method `panics` if the challenge was not yet completed.
     pub fn finalize_order(
         &self,
         client: &Client,
@@ -228,6 +243,7 @@ impl Order {
         Ok(updated_order)
     }
 
+    /// Factors a csr request, which needs to be sent during finalization.
     fn request_csr(
         keypair: &(Rsa<Private>, Rsa<Public>),
         common_name: String,
@@ -249,6 +265,7 @@ impl Order {
     }
 }
 
+/// Holds information about a `Challenge` in the `ACME` context.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Challenge {
     pub status: StatusType,
@@ -258,6 +275,7 @@ pub struct Challenge {
     pub url: String,
 }
 
+/// Holds information about the authentification options in the `ACME` context.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChallengeAuthorisation {
     // type, value
@@ -271,6 +289,8 @@ pub struct ChallengeAuthorisation {
 }
 
 impl ChallengeAuthorisation {
+    /// Completes the http challenge by opening an `http` server which returns the needed token
+    /// under the specified path.
     pub fn complete_http_challenge(
         self,
         client: &Client,
@@ -292,6 +312,7 @@ impl ChallengeAuthorisation {
         )?)
     }
 
+    /// Actually opens the server and kicks of the challenge.
     fn complete_challenge(
         client: &Client,
         challenge_infos: Challenge,
@@ -330,6 +351,7 @@ impl ChallengeAuthorisation {
         Ok(result)
     }
 
+    /// Requests the check of the server at the `ACME` server instance.
     fn kick_off_http_challenge(
         client: &Client,
         challenge_infos: Challenge,
@@ -361,6 +383,7 @@ impl ChallengeAuthorisation {
     }
 }
 
+/// Holds information about a finalized order in the `ACME` context.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdatedOrder {
     pub status: String,
@@ -374,6 +397,7 @@ pub struct UpdatedOrder {
 }
 
 impl UpdatedOrder {
+    /// Downloads an issued certificate.
     pub fn download_certificate(
         &self,
         client: &Client,
