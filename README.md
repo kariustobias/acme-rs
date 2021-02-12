@@ -20,6 +20,12 @@ The installation process is done via `crates.io`. To install the lates version o
 cargo install acme-rs
 ```
 
+you could also specify the installation path (e.g. if you would like to install the tool system wide):
+
+```bash
+cargo install acme-rs --root /usr/local/bin
+```
+
 ## Usage
 `acme-rs` is using the `openssl` rust wrapper crate to generate keys and the csr.
 
@@ -33,7 +39,7 @@ acme-rs [OPTIONS] --domain <domain> --email <email>
 
 
 ## Options
-By running the command "acme-rs --help" you can get an overview of all the commands available.
+By running the command `acme-rs --help` you can get an overview of all the commands available.
 
 ```
 An acme client (RFC8555) written in the rust programming language
