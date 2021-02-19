@@ -1,3 +1,5 @@
+[![Latest Version](https://img.shields.io/crates/v/acme-rs)](https://crates.io/crates/acme-rs)
+
 # acme-rs
 An `ACME` Client for Let's Encrypt written in Rust to request SSL/TLS certificates. This client follows the guidelines specified in [RFC8555](https://tools.ietf.org/html/rfc8555).
 
