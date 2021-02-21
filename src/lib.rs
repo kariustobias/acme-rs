@@ -7,7 +7,7 @@
 //! - By default, acme-rs will send the request to the URL https://acme-v02.api.letsencrypt.org/directory. However, you can manually change the ACME Server URL by using the `--server` flag. Just make sure you pass in the URL pointing to the _directory_ information. The client then fetches all paths for further requests from the endpoint.
 //!
 //! # Usage
-//! This crate currently only exposes a few methods. The main method `generate_cert_for_domain` exposes the functionality of the full working process of requesting a SSTL/TLS certificate.
+//! This crate currently only exposes a few methods. The main method `generate_cert_for_domain` exposes the functionality of the full working process of requesting a SSL/TLS certificate.
 //! It therefore completes the following steps:
 //! - Create a new account for a specialized `email` address.
 //! - Create a new order with that account for a certificate over the specified `domain`.
