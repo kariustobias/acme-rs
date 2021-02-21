@@ -3,6 +3,7 @@ name = "acme-rs"
 version = "0.1.0"
 authors = ["Bastian Kersting <bastian@cmbt.de>", "Tobias Karius <tobias.karius@yahoo.de>", "Elena Lilova <elena.lilova@gmx.de>", "Dominik Jantschar <dominik.jantschar@web.de>"]
 license = "MIT"
+repository = "https://github.com/kariustobias/acme-rs"
 keywords = ["acme", "network", "client", "SSL", "certificate"]
 description = "An acme client (RFC8555) written in the rust programming language"
 readme = "README.md"
@@ -19,3 +20,11 @@ rouille = "3.0.0"
 clap = "3.0.0-beta.2"
 flexi_logger = "0.17.1"
 log = "0.4.14"
+
+[lib]
+name = "acme_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "acme-rs"
+path = "src/bin.rs"

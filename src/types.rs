@@ -68,7 +68,12 @@ impl Directory {
     }
 
     /// Creates a new account.
-    pub fn create_account(&self, client: &Client, p_key: &Rsa<Private>, email: &str) -> Result<Account, Error> {
+    pub fn create_account(
+        &self,
+        client: &Client,
+        p_key: &Rsa<Private>,
+        email: &str,
+    ) -> Result<Account, Error> {
         let jwk = jwk(&p_key)?;
         let header = json!({
             "alg": "RS256",
