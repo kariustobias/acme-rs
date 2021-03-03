@@ -14,6 +14,8 @@ An `ACME` Client for Let's Encrypt written in Rust to request SSL/TLS certificat
 - You have the option to generate you keypair for the certificate first before executing the client. <br>
 - By default, acme-rs will send the request to the URL https://acme-v02.api.letsencrypt.org/directory. However, you can manually change the ACME Server URL by using the `--server` flag. Just make sure you pass in the URL pointing to the _directory_ information. The client then fetches all paths for further requests from the endpoint.
 
+This crate also exposes a libary which allows users to acquire a certificate within their own code. The documentation can be found on docs.rs. The main function exposed by the libary is `generate_cert_for_domain`.
+
 ## Installation
 
 The installation process is done via `crates.io`. To install the lates version of this tool just run

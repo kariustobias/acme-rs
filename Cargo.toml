@@ -1,6 +1,6 @@
 [package]
 name = "acme-rs"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Bastian Kersting <bastian@cmbt.de>", "Tobias Karius <tobias.karius@yahoo.de>", "Elena Lilova <elena.lilova@gmx.de>", "Dominik Jantschar <dominik.jantschar@web.de>"]
 license = "MIT"
 repository = "https://github.com/kariustobias/acme-rs"
