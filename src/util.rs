@@ -91,9 +91,9 @@ pub fn jws(
 
     signer.set_rsa_padding(Padding::PKCS1)?;
     if empty_payload {
-        signer.update(&format!("{}.", header64).as_bytes())?;
+        signer.update(format!("{}.", header64).as_bytes())?;
     } else {
-        signer.update(&format!("{}.{}", header64, payload64).as_bytes())?;
+        signer.update(format!("{}.{}", header64, payload64).as_bytes())?;
     }
 
     let signature = b64(&signer.sign_to_vec()?);

@@ -74,7 +74,7 @@ impl Directory {
         p_key: &Rsa<Private>,
         email: &str,
     ) -> Result<Account, Error> {
-        let jwk = jwk(&p_key)?;
+        let jwk = jwk(p_key)?;
         let header = json!({
             "alg": "RS256",
             "url": self.new_account,
@@ -306,13 +306,13 @@ impl ChallengeAuthorisation {
             .find(|challenge| challenge.challenge_type == "http-01")
             .ok_or(Error::NoHttpChallengePresent)?;
 
-        Ok(ChallengeAuthorisation::complete_challenge(
+        ChallengeAuthorisation::complete_challenge(
             client,
             http_challenge,
             self.nonce,
             account_url,
             p_key,
-        )?)
+        )
     }
 
     /// Actually opens the server and kicks of the challenge.
@@ -323,7 +323,7 @@ impl ChallengeAuthorisation {
         acc_url: &str,
         private_key: &Rsa<Private>,
     ) -> Result<Nonce, Error> {
-        let thumbprint = jwk(&private_key)?;
+        let thumbprint = jwk(private_key)?;
         let mut hasher = Sha256::new();
         hasher.update(&thumbprint.to_string().into_bytes());
         let thumbprint = hasher.finish();
