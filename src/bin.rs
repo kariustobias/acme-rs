@@ -1,9 +1,13 @@
 use acme_rs::{
     generate_cert_for_domain,
-    util::{generate_rsa_keypair, load_keys_from_file, save_certificates, save_keypair},
+    util::{
+        generate_rsa_keypair, load_csr_from_file, load_keys_from_file, save_certificates,
+        save_keypair,
+    },
 };
 use clap::Clap;
 use flexi_logger::Logger;
+use log::info;
 
 const LETS_ENCRYPT_SERVER: &str = "https://acme-v02.api.letsencrypt.org/directory";
 #[allow(dead_code)]
@@ -31,6 +35,9 @@ struct Opts {
     /// The ACME server's URL
     #[clap(short, long)]
     server: Option<String>,
+    /// An optional path to a PEM formatted Certificate Signing Request (CSR)
+    #[clap(long)]
+    csr_path: Option<String>,
     /// Enables debug output.
     #[clap(short, long)]
     verbose: bool,
@@ -62,10 +69,21 @@ fn main() {
     }
     .expect("Could not generate keypair");
 
+    let optional_csr = if let Some(path) = opts.csr_path {
+        Some(load_csr_from_file(&path).expect("Error loading the CSR"))
+    } else {
+        None
+    };
+
+    if opts.verbose && optional_csr.is_some() {
+        info!("Successfully loaded CSR");
+    }
+
     // get the certificate
     let cert_chain = match opts.server {
         Some(url) => generate_cert_for_domain(
             &keypair_for_cert,
+            optional_csr,
             opts.domain,
             url,
             opts.email,
@@ -73,6 +91,7 @@ fn main() {
         ),
         None => generate_cert_for_domain(
             &keypair_for_cert,
+            optional_csr,
             opts.domain,
             LETS_ENCRYPT_SERVER.to_owned(),
             opts.email,

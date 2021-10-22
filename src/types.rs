@@ -1,3 +1,4 @@
+use core::fmt::Debug;
 use openssl::{
     hash::MessageDigest,
     nid::Nid,
@@ -126,6 +127,7 @@ impl Account {
         new_order_url: &str,
         p_key: &Rsa<Private>,
         domain: &str,
+        optional_csr: Option<X509Req>,
     ) -> Result<Order, Error> {
         let header = json!({
             "alg": "RS256",
@@ -150,13 +152,14 @@ impl Account {
 
         let (nonce, mut order): (Nonce, Order) = extract_payload_and_nonce(response)?;
         order.nonce = nonce;
+        order.optional_csr = optional_csr;
 
         Ok(order)
     }
 }
 
 /// Holds information about an `Order` in the `ACME` context.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Order {
     pub status: String,
     pub expires: String,
@@ -165,6 +168,8 @@ pub struct Order {
     pub finalize: String,
     #[serde(skip)]
     pub nonce: Nonce,
+    #[serde(skip)]
+    optional_csr: Option<X509Req>,
 }
 
 impl Order {
@@ -209,7 +214,7 @@ impl Order {
     /// Finalizes an order whose challenge was already done. This returns an `UpdatedOrder` object which
     /// is able to download the issued certificate. This method `panics` if the challenge was not yet completed.
     pub fn finalize_order(
-        &self,
+        self,
         client: &Client,
         account_url: &str,
         new_nonce: Nonce,
@@ -224,7 +229,12 @@ impl Order {
         "nonce": new_nonce,
         });
 
-        let csr = Order::request_csr(cert_keypair, domain.to_owned())?;
+        let csr = if let Some(csr) = self.optional_csr {
+            csr
+        } else {
+            Order::request_csr(cert_keypair, domain.to_owned())?
+        };
+
         let csr_string = b64(&csr.to_der()?);
 
         let payload = json!({ "csr": csr_string });
@@ -265,6 +275,27 @@ impl Order {
         request.sign(pri_key, MessageDigest::sha256())?;
 
         Ok(request.build())
+    }
+}
+
+impl Debug for Order {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Order")
+            .field("status", &self.status)
+            .field("expires", &self.expires)
+            .field("identifiers", &self.identifiers)
+            .field("authorizations", &self.authorizations)
+            .field("finalize", &self.finalize)
+            .field("nonce", &self.nonce)
+            .field(
+                "optional_csr",
+                if self.optional_csr.is_some() {
+                    &"Some(Csr)"
+                } else {
+                    &"None"
+                },
+            )
+            .finish()
     }
 }
 
