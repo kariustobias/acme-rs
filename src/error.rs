@@ -71,3 +71,5 @@ pub enum Error {
     #[error("Currently just http challenges are allowed, so this error is raised if no http challenge is present")]
     NoHttpChallengePresent,
 }
+
+pub(crate) type Result<T> = std::result::Result<T, Error>;

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    error::Error,
+    error::{Error, Result},
     util::{b64, extract_payload_and_nonce, extract_payload_location_and_nonce, jwk, jws},
 };
 
@@ -49,7 +49,7 @@ pub struct Directory {
 impl Directory {
     /// Fetches the directory information from a specific server. This is the first request
     /// that's send to the server as it's return value holds information about the endpoints.
-    pub fn fetch_dir(client: &Client, server_url: &str) -> Result<Self, Error> {
+    pub fn fetch_dir(client: &Client, server_url: &str) -> Result<Self> {
         let mut dir_infos: Self = client.get(server_url).send()?.json()?;
 
         // fetch the new nonce
@@ -73,7 +73,7 @@ impl Directory {
         client: &Client,
         p_key: &Rsa<Private>,
         email: &str,
-    ) -> Result<Account, Error> {
+    ) -> Result<Account> {
         let jwk = jwk(p_key)?;
         let header = json!({
             "alg": "RS256",
@@ -126,7 +126,7 @@ impl Account {
         new_order_url: &str,
         p_key: &Rsa<Private>,
         domain: &str,
-    ) -> Result<Order, Error> {
+    ) -> Result<Order> {
         let header = json!({
             "alg": "RS256",
             "url": new_order_url,
@@ -174,7 +174,7 @@ impl Order {
         client: &Client,
         account_url: &str,
         p_key: &Rsa<Private>,
-    ) -> Result<ChallengeAuthorisation, Error> {
+    ) -> Result<ChallengeAuthorisation> {
         let auth_url = self
             .authorizations
             .first()
@@ -216,7 +216,7 @@ impl Order {
         p_key: &Rsa<Private>,
         cert_keypair: &(Rsa<Private>, Rsa<Public>),
         domain: &str,
-    ) -> Result<UpdatedOrder, Error> {
+    ) -> Result<UpdatedOrder> {
         let header = json!({
         "alg": "RS256",
         "url": self.finalize,
@@ -247,10 +247,7 @@ impl Order {
     }
 
     /// Factors a csr request, which needs to be sent during finalization.
-    fn request_csr(
-        keypair: &(Rsa<Private>, Rsa<Public>),
-        common_name: String,
-    ) -> Result<X509Req, Error> {
+    fn request_csr(keypair: &(Rsa<Private>, Rsa<Public>), common_name: String) -> Result<X509Req> {
         let mut request = X509ReqBuilder::new()?;
         let mut c_name = X509NameBuilder::new()?;
 
@@ -299,7 +296,7 @@ impl ChallengeAuthorisation {
         client: &Client,
         account_url: &str,
         p_key: &Rsa<Private>,
-    ) -> Result<Nonce, Error> {
+    ) -> Result<Nonce> {
         let http_challenge = self
             .challenges
             .into_iter()
@@ -322,7 +319,7 @@ impl ChallengeAuthorisation {
         nonce: Nonce,
         acc_url: &str,
         private_key: &Rsa<Private>,
-    ) -> Result<Nonce, Error> {
+    ) -> Result<Nonce> {
         let thumbprint = jwk(private_key)?;
         let mut hasher = Sha256::new();
         hasher.update(&thumbprint.to_string().into_bytes());
@@ -360,7 +357,7 @@ impl ChallengeAuthorisation {
         nonce: Nonce,
         acc_url: &str,
         private_key: &Rsa<Private>,
-    ) -> Result<Nonce, Error> {
+    ) -> Result<Nonce> {
         let header = json!({
             "alg": "RS256",
             "kid": acc_url,
@@ -405,7 +402,7 @@ impl UpdatedOrder {
         client: &Client,
         account_url: &str,
         p_key: &Rsa<Private>,
-    ) -> Result<Certificate, Error> {
+    ) -> Result<Certificate> {
         let header = json!({
             "alg": "RS256",
             "url": self.certificate,
