@@ -55,10 +55,19 @@ fn main() {
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
     }
 
+    if opts.csr_path.is_some() && (opts.private_key.is_none() || opts.public_key.is_none()) {
+        clap::Error::with_description(
+            r#"Error! If you provide a CSR you must also specify the keypair
+                        that signed the CSR via --private-key and --public-key"#
+                .to_owned(),
+            clap::ErrorKind::ArgumentConflict,
+        )
+        .exit();
+    }
+
     // create a new key pair or otherwise read from a file
     let keypair_for_cert = match (opts.private_key.as_ref(), opts.public_key.as_ref()) {
         (Some(priv_path), Some(pub_path)) => load_keys_from_file(priv_path, pub_path),
-
         (Some(_), None) | (None, Some(_)) => clap::Error::with_description(
             "Error! Provide both a public and a private key!".to_owned(),
             clap::ErrorKind::ArgumentConflict,

@@ -62,7 +62,8 @@ const KEY_WIDTH: u32 = 2048;
 
 /// Generates a certificate for a certain domain. This method contains the logic for communicating with
 /// the server in order to authenticate for the certificate. The keypair that's passed to this method is
-/// used to sign the certificate signing request (CSR).
+/// used to sign the certificate signing request (CSR). In case a pre loaded CSR is passed in, the keypair
+/// needs to be the same as the one that signed the CSR.
 /// # Example
 /// ```rust
 /// use acme_rs::{generate_cert_for_domain, util::{generate_rsa_keypair, save_certificates, save_keypair}};
