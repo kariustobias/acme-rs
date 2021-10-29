@@ -11,18 +11,18 @@ use serde::de::DeserializeOwned;
 use serde_json::json;
 
 use crate::{
-    error::Error,
+    error::{Error, Result},
     types::{Certificate, Nonce},
     KEY_WIDTH,
 };
 
 /// Generates a `RSA` private key.
-pub(crate) fn generate_rsa_key() -> Result<Rsa<Private>, Error> {
+pub(crate) fn generate_rsa_key() -> Result<Rsa<Private>> {
     Ok(Rsa::generate(KEY_WIDTH)?)
 }
 
 /// Generates a `RSA` keypair.
-pub fn generate_rsa_keypair() -> Result<(Rsa<Private>, Rsa<Public>), Error> {
+pub fn generate_rsa_keypair() -> Result<(Rsa<Private>, Rsa<Public>)> {
     let rsa_key = generate_rsa_key()?;
     Ok((
         Rsa::private_key_from_pem(&rsa_key.private_key_to_pem()?)?,
@@ -40,7 +40,7 @@ pub fn generate_rsa_keypair() -> Result<(Rsa<Private>, Rsa<Public>), Error> {
 ///
 /// let jwk = jwk(priv_key).expect("Error while creating jwk");
 /// ```
-pub fn jwk(private_key: &Rsa<Private>) -> Result<serde_json::Value, Error> {
+pub fn jwk(private_key: &Rsa<Private>) -> Result<serde_json::Value> {
     let e = b64(&private_key.e().to_vec());
     let n = b64(&private_key.n().to_vec());
 
@@ -79,7 +79,7 @@ pub fn jws(
     payload: serde_json::Value,
     header: serde_json::Value,
     private_key: &Rsa<Private>,
-) -> Result<serde_json::Value, Error> {
+) -> Result<serde_json::Value> {
     // edge case when the payload needs to be empty, e.g. for
     // fetching the challenges or downloading the certificate
     let empty_payload = payload == json!("");
@@ -92,9 +92,9 @@ pub fn jws(
 
     signer.set_rsa_padding(Padding::PKCS1)?;
     if empty_payload {
-        signer.update(&format!("{}.", header64).as_bytes())?;
+        signer.update(format!("{}.", header64).as_bytes())?;
     } else {
-        signer.update(&format!("{}.{}", header64, payload64).as_bytes())?;
+        signer.update(format!("{}.{}", header64, payload64).as_bytes())?;
     }
 
     let signature = b64(&signer.sign_to_vec()?);
@@ -113,7 +113,7 @@ pub(crate) fn b64(to_encode: &[u8]) -> String {
 
 /// Extracts the payload and `replay-nonce` header field from a given http `Response`.
 #[inline]
-pub(crate) fn extract_payload_and_nonce<T>(response: Response) -> Result<(Nonce, T), Error>
+pub(crate) fn extract_payload_and_nonce<T>(response: Response) -> Result<(Nonce, T)>
 where
     T: DeserializeOwned,
 {
@@ -132,7 +132,7 @@ where
 #[inline]
 pub(crate) fn extract_payload_location_and_nonce<T>(
     response: Response,
-) -> Result<(String, Nonce, T), Error>
+) -> Result<(String, Nonce, T)>
 where
     T: DeserializeOwned,
 {
@@ -164,7 +164,7 @@ pub fn load_csr_from_file(path: &str) -> Result<X509Req, Error> {
 /// Parses the certificate and writes them into to files:
 /// * my_cert.crt -> the certificate issued for the request,
 /// * cert_chain.crt -> the certificate chain issued for the request.
-pub fn save_certificates(certificate_chain: Certificate) -> Result<(), Error> {
+pub fn save_certificates(certificate_chain: Certificate) -> Result<()> {
     // extract the first certificat (certificate for the specified domain)
     let cert_me = certificate_chain
         .lines()
@@ -184,7 +184,7 @@ pub fn save_certificates(certificate_chain: Certificate) -> Result<(), Error> {
 }
 
 /// Saves an rsa keypair into two files `priv.pem` and `pub.pem`.
-pub fn save_keypair(keypair: &(Rsa<Private>, Rsa<Public>)) -> Result<(), Error> {
+pub fn save_keypair(keypair: &(Rsa<Private>, Rsa<Public>)) -> Result<()> {
     let private_key = keypair.0.private_key_to_pem()?;
     let public_key = keypair.1.public_key_to_pem()?;
 
@@ -199,7 +199,7 @@ pub fn save_keypair(keypair: &(Rsa<Private>, Rsa<Public>)) -> Result<(), Error> 
 pub fn load_keys_from_file(
     path_to_private: &str,
     path_to_public: &str,
-) -> Result<(Rsa<Private>, Rsa<Public>), Error> {
+) -> Result<(Rsa<Private>, Rsa<Public>)> {
     let priv_key = std::fs::read(path_to_private)?;
     let pub_key = std::fs::read(path_to_public)?;
 
