@@ -20,6 +20,7 @@ rouille = "3.0.0"
 clap = "3.0.0-beta.2"
 flexi_logger = "0.17.1"
 log = "0.4.14"
+thiserror = "1.0"
 
 [lib]
 name = "acme_rs"
