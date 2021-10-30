@@ -4,6 +4,7 @@ use openssl::{
     pkey::{PKey, Private, Public},
     rsa::{Padding, Rsa},
     sign::Signer,
+    x509::X509Req,
 };
 use reqwest::blocking::Response;
 use serde::de::DeserializeOwned;
@@ -150,6 +151,14 @@ where
         .to_owned();
 
     Ok((location, replay_nonce, response.json()?))
+}
+
+/// Loads a PEM formatted certificate signing request (CSR) from
+/// a file and returns it as `openssl::X509Req`.
+pub fn load_csr_from_file(path: &str) -> Result<X509Req, Error> {
+    let bytes = std::fs::read(path)?;
+
+    Ok(X509Req::from_pem(&bytes)?)
 }
 
 /// Parses the certificate and writes them into to files:

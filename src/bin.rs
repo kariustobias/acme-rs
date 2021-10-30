@@ -1,9 +1,13 @@
 use acme_rs::{
     generate_cert_for_domain,
-    util::{generate_rsa_keypair, load_keys_from_file, save_certificates, save_keypair},
+    util::{
+        generate_rsa_keypair, load_csr_from_file, load_keys_from_file, save_certificates,
+        save_keypair,
+    },
 };
 use clap::Clap;
 use flexi_logger::Logger;
+use log::info;
 
 const LETS_ENCRYPT_SERVER: &str = "https://acme-v02.api.letsencrypt.org/directory";
 #[allow(dead_code)]
@@ -31,6 +35,9 @@ struct Opts {
     /// The ACME server's URL
     #[clap(short, long)]
     server: Option<String>,
+    /// An optional path to a PEM formatted Certificate Signing Request (CSR)
+    #[clap(long)]
+    csr_path: Option<String>,
     /// Enables debug output.
     #[clap(short, long)]
     verbose: bool,
@@ -48,10 +55,19 @@ fn main() {
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
     }
 
+    if opts.csr_path.is_some() && (opts.private_key.is_none() || opts.public_key.is_none()) {
+        clap::Error::with_description(
+            r#"Error! If you provide a CSR you must also specify the keypair
+                        that signed the CSR via --private-key and --public-key"#
+                .to_owned(),
+            clap::ErrorKind::ArgumentConflict,
+        )
+        .exit();
+    }
+
     // create a new key pair or otherwise read from a file
     let keypair_for_cert = match (opts.private_key.as_ref(), opts.public_key.as_ref()) {
         (Some(priv_path), Some(pub_path)) => load_keys_from_file(priv_path, pub_path),
-
         (Some(_), None) | (None, Some(_)) => clap::Error::with_description(
             "Error! Provide both a public and a private key!".to_owned(),
             clap::ErrorKind::ArgumentConflict,
@@ -62,10 +78,21 @@ fn main() {
     }
     .expect("Could not generate keypair");
 
+    let optional_csr = if let Some(path) = opts.csr_path {
+        Some(load_csr_from_file(&path).expect("Error loading the CSR"))
+    } else {
+        None
+    };
+
+    if opts.verbose && optional_csr.is_some() {
+        info!("Successfully loaded CSR");
+    }
+
     // get the certificate
     let cert_chain = match opts.server {
         Some(url) => generate_cert_for_domain(
             &keypair_for_cert,
+            optional_csr,
             opts.domain,
             url,
             opts.email,
@@ -73,6 +100,7 @@ fn main() {
         ),
         None => generate_cert_for_domain(
             &keypair_for_cert,
+            optional_csr,
             opts.domain,
             LETS_ENCRYPT_SERVER.to_owned(),
             opts.email,

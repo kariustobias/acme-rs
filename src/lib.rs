@@ -42,6 +42,7 @@ use log::info;
 use openssl::{
     pkey::{Private, Public},
     rsa::Rsa,
+    x509::X509Req,
 };
 use reqwest::blocking::Client;
 use types::{Certificate, Directory};
@@ -61,7 +62,8 @@ const KEY_WIDTH: u32 = 2048;
 
 /// Generates a certificate for a certain domain. This method contains the logic for communicating with
 /// the server in order to authenticate for the certificate. The keypair that's passed to this method is
-/// used to sign the certificate signing request (CSR).
+/// used to sign the certificate signing request (CSR). In case a pre loaded CSR is passed in, the keypair
+/// needs to be the same as the one that signed the CSR.
 /// # Example
 /// ```rust
 /// use acme_rs::{generate_cert_for_domain, util::{generate_rsa_keypair, save_certificates, save_keypair}};
@@ -81,6 +83,7 @@ const KEY_WIDTH: u32 = 2048;
 /// ```
 pub fn generate_cert_for_domain<T: AsRef<str>>(
     keypair_for_cert: &(Rsa<Private>, Rsa<Public>),
+    optional_csr: Option<X509Req>,
     domain: T,
     server: T,
     email: T,
@@ -99,8 +102,13 @@ pub fn generate_cert_for_domain<T: AsRef<str>>(
     }
 
     // create a new order
-    let order =
-        new_acc.create_new_order(&client, &dir_infos.new_order, &keypair, domain.as_ref())?;
+    let order = new_acc.create_new_order(
+        &client,
+        &dir_infos.new_order,
+        &keypair,
+        domain.as_ref(),
+        optional_csr,
+    )?;
     if verbose {
         info!(
             "Opened new order for domain {}: {:#?}",
