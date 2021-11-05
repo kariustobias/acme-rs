@@ -155,7 +155,7 @@ where
 
 /// Loads a PEM formatted certificate signing request (CSR) from
 /// a file and returns it as `openssl::X509Req`.
-pub fn load_csr_from_file(path: &str) -> Result<X509Req, Error> {
+pub fn load_csr_from_file(path: &str) -> Result<X509Req> {
     let bytes = std::fs::read(path)?;
 
     Ok(X509Req::from_pem(&bytes)?)
