@@ -70,6 +70,8 @@ pub enum Error {
     FromIoError(#[from] io::Error),
     #[error("Currently just http challenges are allowed, so this error is raised if no http challenge is present")]
     NoHttpChallengePresent,
+    #[error("There was no web server found")]
+    NoWebServer,
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;

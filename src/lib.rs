@@ -20,16 +20,18 @@
 //! This method is also used by the binary cli that ships with this crate. Usage instructions for the cli and information about the project in general can be found [here](https://github.com/kariustobias/acme-rs).
 //!
 //! ## Example
-//! ```rust
+//! ```ignore,rust
 //! use acme_rs::{generate_cert_for_domain, util::{generate_rsa_keypair, save_certificates, save_keypair}};
 //!
 //! // create a keypair and request the certificate for it
 //! let keypair = generate_rsa_keypair().expect("Error during key creation");
 //! let cert_chain = generate_cert_for_domain(
 //!            &keypair,
+//!            None,
 //!            "www.example.org",
 //!            "https://acme-v02.api.letsencrypt.org/directory",
 //!            "max@mustermann.de",
+//!            false,
 //!            false,
 //!        ).expect("Error while requesting the certificate.")
 //!
@@ -65,16 +67,18 @@ const KEY_WIDTH: u32 = 2048;
 /// used to sign the certificate signing request (CSR). In case a pre loaded CSR is passed in, the keypair
 /// needs to be the same as the one that signed the CSR.
 /// # Example
-/// ```rust
+/// ```ignore,rust
 /// use acme_rs::{generate_cert_for_domain, util::{generate_rsa_keypair, save_certificates, save_keypair}};
 ///
 /// // create a keypair and request the certificate for it
 /// let keypair = generate_rsa_keypair().expect("Error during key creation");
 /// let cert_chain = generate_cert_for_domain(
 ///            &keypair,
+///            None,
 ///            "www.example.org",
 ///            "https://acme-v02.api.letsencrypt.org/directory",
 ///            "max@mustermann.de",
+///            false,
 ///            false,
 ///        ).expect("Error while requesting the certificate.")
 ///
@@ -87,6 +91,7 @@ pub fn generate_cert_for_domain<T: AsRef<str>>(
     domain: T,
     server: T,
     email: T,
+    standalone: bool,
     verbose: bool,
 ) -> Result<Certificate, Error> {
     // this keypair is used for authentificating the requests, but does not matter afterwards
@@ -127,8 +132,12 @@ pub fn generate_cert_for_domain<T: AsRef<str>>(
     }
 
     // complete the challenge and save the nonce that's needed for further authentification
-    let new_nonce =
-        challenge.complete_http_challenge(&client, &new_acc.account_location, &keypair)?;
+    let new_nonce = challenge.complete_http_challenge(
+        &client,
+        &new_acc.account_location,
+        &keypair,
+        standalone,
+    )?;
     if verbose {
         info!("Succesfully completed the http challenge");
     }
