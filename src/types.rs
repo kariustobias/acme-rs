@@ -389,7 +389,7 @@ impl ChallengeAuthorisation {
                     }
                 });
             });
-        } else if check_for_existing_server()? {
+        } else if check_for_existing_server() {
             const WEB_ROOT: &str = "/var/www/html";
 
             let full_path = Path::new(WEB_ROOT).join(CHALLENGE_PATH);

@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::net::TcpStream;
 
 use base64::encode_config;
 use openssl::{
@@ -20,13 +20,18 @@ use crate::{
 
 /// Check if a process if using port 80. A return value of false means there wasn't a process
 /// found.
-pub fn check_for_existing_server() -> Result<bool> {
-    // If it was unsuccessful (i.e. exit code 1), then nothing is currently using that port.
-    Ok(Command::new("lsof")
-        .arg("-i")
-        .arg(":80")
-        .status()?
-        .success())
+pub fn check_for_existing_server() -> bool {
+    // These will parse so it's okay to unwrap here.
+    let addrs = [
+        "0.0.0.0:80".parse().unwrap(),
+        "127.0.0.1:80".parse().unwrap(),
+    ];
+
+    if let Ok(_) = TcpStream::connect(&addrs[..]) {
+        true
+    } else {
+        false
+    }
 }
 
 /// Generates a `RSA` private key.

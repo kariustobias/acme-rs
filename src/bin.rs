@@ -92,7 +92,7 @@ fn main() {
         info!("Successfully loaded CSR");
     }
 
-    if opts.standalone && check_for_existing_server().unwrap_or_default() {
+    if opts.standalone && check_for_existing_server() {
         app.error(
             clap::ErrorKind::DisplayHelp,
             "Error! Provided the standalone option with a process already listening on port 80",
