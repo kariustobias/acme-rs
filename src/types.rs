@@ -1,3 +1,7 @@
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::Path;
+
 use core::fmt::Debug;
 use openssl::{
     hash::MessageDigest,
@@ -13,7 +17,10 @@ use serde_json::json;
 
 use crate::{
     error::{Error, Result},
-    util::{b64, extract_payload_and_nonce, extract_payload_location_and_nonce, jwk, jws},
+    util::{
+        b64, check_for_existing_server, extract_payload_and_nonce,
+        extract_payload_location_and_nonce, jwk, jws,
+    },
 };
 
 pub type Nonce = String;
@@ -327,6 +334,7 @@ impl ChallengeAuthorisation {
         client: &Client,
         account_url: &str,
         p_key: &Rsa<Private>,
+        standalone: bool,
     ) -> Result<Nonce> {
         let http_challenge = self
             .challenges
@@ -340,6 +348,7 @@ impl ChallengeAuthorisation {
             self.nonce,
             account_url,
             p_key,
+            standalone,
         )
     }
 
@@ -350,7 +359,10 @@ impl ChallengeAuthorisation {
         nonce: Nonce,
         acc_url: &str,
         private_key: &Rsa<Private>,
+        standalone: bool,
     ) -> Result<Nonce> {
+        const CHALLENGE_PATH: &str = "/.well-known/acme-challenge";
+
         let thumbprint = jwk(private_key)?;
         let mut hasher = Sha256::new();
         hasher.update(&thumbprint.to_string().into_bytes());
@@ -366,17 +378,27 @@ impl ChallengeAuthorisation {
             private_key,
         )?;
 
-        std::thread::spawn(|| {
-            rouille::start_server("0.0.0.0:80", move |request| {
-                if request.raw_url()
-                    == format!("/.well-known/acme-challenge/{}", challenge_infos.token)
-                {
-                    rouille::Response::text(challenge_content.clone())
-                } else {
-                    rouille::Response::empty_404()
-                }
+        if standalone {
+            std::thread::spawn(|| {
+                rouille::start_server("0.0.0.0:80", move |request| {
+                    if request.raw_url() == format!("{}/{}", CHALLENGE_PATH, challenge_infos.token)
+                    {
+                        rouille::Response::text(challenge_content.clone())
+                    } else {
+                        rouille::Response::empty_404()
+                    }
+                });
             });
-        });
+        } else if check_for_existing_server() {
+            const WEB_ROOT: &str = "/var/www/html";
+
+            let full_path = Path::new(WEB_ROOT).join(CHALLENGE_PATH);
+            fs::create_dir_all(full_path.clone())?;
+            let mut output = File::create(full_path.join(challenge_infos.token))?;
+            write!(output, "{}", challenge_content)?;
+        } else {
+            return Err(Error::NoWebServer);
+        }
         std::thread::sleep(std::time::Duration::from_secs(5));
         Ok(result)
     }

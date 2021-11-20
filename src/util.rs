@@ -1,3 +1,5 @@
+use std::net::TcpStream;
+
 use base64::encode_config;
 use openssl::{
     hash::MessageDigest,
@@ -16,6 +18,22 @@ use crate::{
     KEY_WIDTH,
 };
 
+/// Check if a process if using port 80. A return value of false means there wasn't a process
+/// found.
+pub fn check_for_existing_server() -> bool {
+    // These will parse so it's okay to unwrap here.
+    let addrs = [
+        "0.0.0.0:80".parse().unwrap(),
+        "127.0.0.1:80".parse().unwrap(),
+    ];
+
+    if let Ok(_) = TcpStream::connect(&addrs[..]) {
+        true
+    } else {
+        false
+    }
+}
+
 /// Generates a `RSA` private key.
 pub(crate) fn generate_rsa_key() -> Result<Rsa<Private>> {
     Ok(Rsa::generate(KEY_WIDTH)?)
@@ -32,7 +50,7 @@ pub fn generate_rsa_keypair() -> Result<(Rsa<Private>, Rsa<Public>)> {
 
 /// Builds a json web key `JWK` (RFC7517) for a RSA private key.
 /// # Example
-/// ```rust
+/// ```ignore,rust
 /// use acme_rs::util::jwk;
 /// use openssl::Rsa;
 ///
@@ -54,7 +72,7 @@ pub fn jwk(private_key: &Rsa<Private>) -> Result<serde_json::Value> {
 /// Constructs a json web signature `JWS` (RFC7515) in the flattened `JSON` form for a specified
 /// payload. This involves signing the JWS with the RS256 algorithm.
 /// # Example
-/// ```rust
+/// ```ignore,rust
 /// use acme_rs::util::jws;
 /// use serde_json::json;
 /// use openssl::Rsa;
@@ -155,7 +173,7 @@ where
 
 /// Loads a PEM formatted certificate signing request (CSR) from
 /// a file and returns it as `openssl::X509Req`.
-pub fn load_csr_from_file(path: &str) -> Result<X509Req, Error> {
+pub fn load_csr_from_file(path: &str) -> Result<X509Req> {
     let bytes = std::fs::read(path)?;
 
     Ok(X509Req::from_pem(&bytes)?)
