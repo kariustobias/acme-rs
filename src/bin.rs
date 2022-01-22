@@ -5,7 +5,7 @@ use acme_rs::{
         save_certificates, save_keypair,
     },
 };
-use clap::{IntoApp, Parser};
+use clap::{Parser, IntoApp};
 use flexi_logger::Logger;
 use log::info;
 
@@ -14,7 +14,7 @@ const LETS_ENCRYPT_SERVER: &str = "https://acme-v02.api.letsencrypt.org/director
 const LETS_ENCRYPT_STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 
 /// An acme client (RFC8555) written in the rust programming language
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[clap(
     version = "0.1.0",
     author = "Bastian Kersting <bastian@cmbt.de>, Tobias Karius <tobias.karius@yahoo.de>, Elena Lilova <elena.lilova@gmx.de>, Dominik Jantschar <dominik.jantschar@web.de>"

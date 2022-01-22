@@ -16,7 +16,7 @@ reqwest = { version = "0.11", features = ["blocking", "json"] }
 openssl = { version = "0.10", features = ["vendored"] }
 base64 = "0.13.0"
 rouille = "3.0.0"
-clap = "3.0.0-beta.5"
+clap = { version = "3.0.10", features = ["derive"] }
 flexi_logger = "0.17.1"
 log = "0.4.14"
 thiserror = "1.0"
