@@ -27,11 +27,7 @@ pub fn check_for_existing_server() -> bool {
         "127.0.0.1:80".parse().unwrap(),
     ];
 
-    if let Ok(_) = TcpStream::connect(&addrs[..]) {
-        true
-    } else {
-        false
-    }
+    TcpStream::connect(&addrs[..]).is_ok()
 }
 
 /// Generates a `RSA` private key.
