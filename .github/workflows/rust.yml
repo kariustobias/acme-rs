@@ -1,4 +1,4 @@
-name: Build
+name: Build and test
 
 on:
   push:
@@ -12,9 +12,13 @@ env:
 jobs:
   build:
 
-    runs-on: macos-11
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-    - name: Check
-      run: cargo check
+    - name: Clippy
+      run: cargo clippy --all
+    - name: Test
+      run: cargo test
+    - name: Check formatting
+      run: cargo fmt --all -- --check

@@ -5,7 +5,7 @@ use acme_rs::{
         save_certificates, save_keypair,
     },
 };
-use clap::{Parser, IntoApp};
+use clap::{IntoApp, Parser};
 use flexi_logger::Logger;
 use log::info;
 
@@ -82,11 +82,9 @@ fn main() {
     }
     .expect("Could not generate keypair");
 
-    let optional_csr = if let Some(path) = opts.csr_path {
-        Some(load_csr_from_file(&path).expect("Error loading the CSR"))
-    } else {
-        None
-    };
+    let optional_csr = opts
+        .csr_path
+        .map(|path| load_csr_from_file(&path).expect("Error loading the CSR"));
 
     if opts.verbose && optional_csr.is_some() {
         info!("Successfully loaded CSR");
