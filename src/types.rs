@@ -361,7 +361,7 @@ impl ChallengeAuthorisation {
         private_key: &Rsa<Private>,
         standalone: bool,
     ) -> Result<Nonce> {
-        const CHALLENGE_PATH: &str = "/.well-known/acme-challenge";
+        const CHALLENGE_PATH: &str = ".well-known/acme-challenge";
 
         let thumbprint = jwk(private_key)?;
         let mut hasher = Sha256::new();
@@ -381,7 +381,7 @@ impl ChallengeAuthorisation {
         if standalone {
             std::thread::spawn(|| {
                 rouille::start_server("0.0.0.0:80", move |request| {
-                    if request.raw_url() == format!("{}/{}", CHALLENGE_PATH, challenge_infos.token)
+                    if request.raw_url() == format!("/{}/{}", CHALLENGE_PATH, challenge_infos.token)
                     {
                         rouille::Response::text(challenge_content.clone())
                     } else {
